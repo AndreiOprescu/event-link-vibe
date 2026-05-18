@@ -13,7 +13,8 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AppAppIndexRouteImport } from './routes/_app/app.index'
+import { Route as AppAppRouteImport } from './routes/_app.app'
+import { Route as AppAppEventEventIdRouteImport } from './routes/_app.app.event.$eventId'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -34,23 +35,30 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppAppIndexRoute = AppAppIndexRouteImport.update({
-  id: '/app/',
-  path: '/app/',
+const AppAppRoute = AppAppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => AppRoute,
+} as any)
+const AppAppEventEventIdRoute = AppAppEventEventIdRouteImport.update({
+  id: '/event/$eventId',
+  path: '/event/$eventId',
+  getParentRoute: () => AppAppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/app/': typeof AppAppIndexRoute
+  '/app': typeof AppAppRouteWithChildren
+  '/app/event/$eventId': typeof AppAppEventEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/app': typeof AppAppIndexRoute
+  '/app': typeof AppAppRouteWithChildren
+  '/app/event/$eventId': typeof AppAppEventEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -58,14 +66,22 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/_app/app/': typeof AppAppIndexRoute
+  '/_app/app': typeof AppAppRouteWithChildren
+  '/_app/app/event/$eventId': typeof AppAppEventEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/onboarding' | '/app/'
+  fullPaths: '/' | '/login' | '/onboarding' | '/app' | '/app/event/$eventId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/onboarding' | '/app'
-  id: '__root__' | '/' | '/_app' | '/login' | '/onboarding' | '/_app/app/'
+  to: '/' | '/login' | '/onboarding' | '/app' | '/app/event/$eventId'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/login'
+    | '/onboarding'
+    | '/_app/app'
+    | '/_app/app/event/$eventId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -105,22 +121,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/app/': {
-      id: '/_app/app/'
+    '/_app/app': {
+      id: '/_app/app'
       path: '/app'
-      fullPath: '/app/'
-      preLoaderRoute: typeof AppAppIndexRouteImport
+      fullPath: '/app'
+      preLoaderRoute: typeof AppAppRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/app/event/$eventId': {
+      id: '/_app/app/event/$eventId'
+      path: '/event/$eventId'
+      fullPath: '/app/event/$eventId'
+      preLoaderRoute: typeof AppAppEventEventIdRouteImport
+      parentRoute: typeof AppAppRoute
     }
   }
 }
 
+interface AppAppRouteChildren {
+  AppAppEventEventIdRoute: typeof AppAppEventEventIdRoute
+}
+
+const AppAppRouteChildren: AppAppRouteChildren = {
+  AppAppEventEventIdRoute: AppAppEventEventIdRoute,
+}
+
+const AppAppRouteWithChildren =
+  AppAppRoute._addFileChildren(AppAppRouteChildren)
+
 interface AppRouteChildren {
-  AppAppIndexRoute: typeof AppAppIndexRoute
+  AppAppRoute: typeof AppAppRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppAppIndexRoute: AppAppIndexRoute,
+  AppAppRoute: AppAppRouteWithChildren,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -134,3 +168,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
