@@ -1,7 +1,7 @@
-import { Avatar } from "@/data/mock";
+type BubbleUser = { id: string; name: string; emoji: string; color: string };
 
 type Props = {
-  user: Avatar;
+  user: BubbleUser;
   size?: number;
   ringClass?: string;
   label?: boolean;
