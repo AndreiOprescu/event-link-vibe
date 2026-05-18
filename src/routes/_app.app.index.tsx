@@ -3,7 +3,7 @@ import { useState } from "react";
 import { EVENTS } from "@/data/mock";
 import { ArrowRight, Hash, Plus, Sparkles } from "lucide-react";
 
-export const Route = createFileRoute("/_app/app")({
+export const Route = createFileRoute("/_app/app/")({
   head: () => ({ meta: [{ title: "Your events — EventLabs" }] }),
   component: MainScreen,
 });
