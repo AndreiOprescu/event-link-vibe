@@ -19,6 +19,8 @@ export type Database = {
           created_at: string
           event_id: string
           id: string
+          kind: string
+          parent_id: string | null
           profile_id: string
           text: string
         }
@@ -26,6 +28,8 @@ export type Database = {
           created_at?: string
           event_id: string
           id?: string
+          kind?: string
+          parent_id?: string | null
           profile_id: string
           text: string
         }
@@ -33,6 +37,8 @@ export type Database = {
           created_at?: string
           event_id?: string
           id?: string
+          kind?: string
+          parent_id?: string | null
           profile_id?: string
           text?: string
         }
@@ -42,6 +48,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_messages_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "event_messages"
             referencedColumns: ["id"]
           },
           {
