@@ -194,6 +194,7 @@ function EventRoom() {
 
       {chatOpen && (
         <ChatDrawer
+          eventId={eventId}
           user={selectedUser}
           messages={messages}
           profileById={profileById}
@@ -256,7 +257,7 @@ function ProfileDrawer({ p, onClose, onChat }: { p: Profile; onClose: () => void
 }
 
 function ChatDrawer({
-  user, messages, profileById, me, onClose, sentinelRef,
+  user, messages, profileById, me, onClose, sentinelRef, eventId,
 }: {
   user: Profile | null;
   messages: Msg[];
@@ -264,20 +265,41 @@ function ChatDrawer({
   me: Profile | null;
   onClose: () => void;
   sentinelRef: React.RefObject<HTMLDivElement | null>;
+  eventId: string;
 }) {
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || !me || sending) return;
+    setSending(true);
+    setDraft("");
+    const { error } = await supabase.from("event_messages").insert({ event_id: eventId, profile_id: me.id, text });
+    if (error) console.error(error);
+    setSending(false);
+    requestAnimationFrame(() => sentinelRef.current?.scrollIntoView({ behavior: "smooth" }));
+  };
+
   return (
     <div className="absolute inset-0 z-50 flex justify-end bg-background/40 backdrop-blur-sm" onClick={onClose}>
       <div className="flex h-full w-full max-w-md flex-col border-l border-border bg-popover shadow-card" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border p-4">
           <div className="flex items-center gap-3">
-            {user && (
+            {user ? (
               <div className="flex h-10 w-10 items-center justify-center rounded-full text-xl" style={{ backgroundColor: user.color }}>
                 {user.emoji}
+              </div>
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-lime">
+                <MessageCircle className="h-5 w-5" />
               </div>
             )}
             <div>
               <div className="font-display text-sm font-semibold">{user?.display_name ?? "Room chat"}</div>
-              <div className="text-[10px] text-muted-foreground">Everyone in the room</div>
+              <div className="text-[10px] text-muted-foreground">
+                {user ? "Room chat · everyone can see this" : "Everyone in the room"}
+              </div>
             </div>
           </div>
           <button onClick={onClose}><X className="h-4 w-4 text-muted-foreground" /></button>
@@ -305,6 +327,26 @@ function ChatDrawer({
             );
           })}
           <div ref={sentinelRef} />
+        </div>
+
+        <div className="border-t border-border p-3">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-background/60 p-1.5">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              placeholder={user ? "Message everyone in the room…" : "Message the room…"}
+              className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
+              autoFocus
+            />
+            <button
+              onClick={send}
+              disabled={!draft.trim() || sending}
+              className="flex items-center gap-1 rounded-full bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
