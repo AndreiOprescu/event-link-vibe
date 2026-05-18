@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { EVENTS } from "@/data/mock";
+import { useEffect, useState } from "react";
 import { ArrowRight, Hash, Plus, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_app/app/")({
   head: () => ({ meta: [{ title: "Your events — EventLabs" }] }),
@@ -9,20 +9,35 @@ export const Route = createFileRoute("/_app/app/")({
 });
 
 type Tab = "live" | "upcoming" | "past";
+type Event = {
+  id: string;
+  code: string;
+  title: string;
+  host: string;
+  date_label: string;
+  status: Tab;
+  color: string;
+  attendees: number;
+};
 
 function MainScreen() {
   const [tab, setTab] = useState<Tab>("live");
   const [code, setCode] = useState("");
+  const [events, setEvents] = useState<Event[]>([]);
 
-  const filtered = EVENTS.filter((e) => e.status === tab);
+  useEffect(() => {
+    supabase.from("events").select("*").order("created_at", { ascending: true }).then(({ data }) => {
+      setEvents((data ?? []) as Event[]);
+    });
+  }, []);
+
+  const filtered = events.filter((e) => e.status === tab);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-            — Your rooms
-          </div>
+          <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">— Your rooms</div>
           <h1 className="mt-2 font-display text-4xl font-semibold sm:text-5xl">
             Drop into an event<span className="text-lime">.</span>
           </h1>
@@ -41,7 +56,7 @@ function MainScreen() {
           />
           <Link
             to="/app/event/$eventId"
-            params={{ eventId: "e1" }}
+            params={{ eventId: events.find((e) => e.code === code)?.id ?? "e1" }}
             className="flex items-center gap-1 rounded-xl bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground"
           >
             Join <ArrowRight className="h-3 w-3" />
@@ -72,9 +87,7 @@ function MainScreen() {
             className="group relative overflow-hidden rounded-3xl border border-border bg-surface p-6 transition hover:border-lime/40 hover:shadow-glow"
           >
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                {e.code}
-              </span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{e.code}</span>
               {e.status === "live" && (
                 <span className="flex items-center gap-1.5 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-medium text-lime">
                   <span className="h-1.5 w-1.5 rounded-full bg-lime pulse-lime" />
@@ -83,12 +96,10 @@ function MainScreen() {
               )}
             </div>
             <h3 className="mt-12 font-display text-2xl font-semibold leading-tight">{e.title}</h3>
-            <div className="mt-2 text-xs text-muted-foreground">{e.host} · {e.date}</div>
+            <div className="mt-2 text-xs text-muted-foreground">{e.host} · {e.date_label}</div>
             <div className="mt-6 flex items-end justify-between">
               <div>
-                <div className="font-display text-3xl font-semibold" style={{ color: e.color }}>
-                  {e.attendees}
-                </div>
+                <div className="font-display text-3xl font-semibold" style={{ color: e.color }}>{e.attendees}</div>
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">in the room</div>
               </div>
               <ArrowRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-lime" />
@@ -104,12 +115,12 @@ function MainScreen() {
         )}
       </div>
 
-      {tab === "past" && (
+      {tab === "past" && filtered.length > 0 && (
         <div className="mt-10 rounded-3xl border border-lime/30 bg-lime/5 p-6">
           <div className="flex items-start gap-3">
             <Sparkles className="mt-0.5 h-5 w-5 text-lime" />
             <div>
-              <div className="font-display text-lg font-semibold">Reflect on Startup Summit '26</div>
+              <div className="font-display text-lg font-semibold">Reflect on {filtered[0].title}</div>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 Did you attend? Share an insight, a takeaway, or a person you'd like to remember.
               </p>
