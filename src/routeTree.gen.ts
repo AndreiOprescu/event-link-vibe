@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppAppRouteImport } from './routes/_app.app'
+import { Route as AppAppIndexRouteImport } from './routes/_app.app.index'
 import { Route as AppAppProfileRouteImport } from './routes/_app.app.profile'
 import { Route as AppAppEventEventIdRouteImport } from './routes/_app.app.event.$eventId'
 import { Route as AppAppEventEventIdBreakRouteImport } from './routes/_app.app.event.$eventId.break'
@@ -42,6 +43,11 @@ const AppAppRoute = AppAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAppIndexRoute = AppAppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAppRoute,
+} as any)
 const AppAppProfileRoute = AppAppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/app': typeof AppAppRouteWithChildren
   '/app/profile': typeof AppAppProfileRoute
+  '/app/': typeof AppAppIndexRoute
   '/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/app/event/$eventId/break': typeof AppAppEventEventIdBreakRoute
 }
@@ -71,8 +78,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/app': typeof AppAppRouteWithChildren
   '/app/profile': typeof AppAppProfileRoute
+  '/app': typeof AppAppIndexRoute
   '/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/app/event/$eventId/break': typeof AppAppEventEventIdBreakRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/_app/app': typeof AppAppRouteWithChildren
   '/_app/app/profile': typeof AppAppProfileRoute
+  '/_app/app/': typeof AppAppIndexRoute
   '/_app/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/_app/app/event/$eventId/break': typeof AppAppEventEventIdBreakRoute
 }
@@ -95,6 +103,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/app'
     | '/app/profile'
+    | '/app/'
     | '/app/event/$eventId'
     | '/app/event/$eventId/break'
   fileRoutesByTo: FileRoutesByTo
@@ -102,8 +111,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/onboarding'
-    | '/app'
     | '/app/profile'
+    | '/app'
     | '/app/event/$eventId'
     | '/app/event/$eventId/break'
   id:
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/_app/app'
     | '/_app/app/profile'
+    | '/_app/app/'
     | '/_app/app/event/$eventId'
     | '/_app/app/event/$eventId/break'
   fileRoutesById: FileRoutesById
@@ -162,6 +172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/app/': {
+      id: '/_app/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppAppIndexRouteImport
+      parentRoute: typeof AppAppRoute
+    }
     '/_app/app/profile': {
       id: '/_app/app/profile'
       path: '/profile'
@@ -199,11 +216,13 @@ const AppAppEventEventIdRouteWithChildren =
 
 interface AppAppRouteChildren {
   AppAppProfileRoute: typeof AppAppProfileRoute
+  AppAppIndexRoute: typeof AppAppIndexRoute
   AppAppEventEventIdRoute: typeof AppAppEventEventIdRouteWithChildren
 }
 
 const AppAppRouteChildren: AppAppRouteChildren = {
   AppAppProfileRoute: AppAppProfileRoute,
+  AppAppIndexRoute: AppAppIndexRoute,
   AppAppEventEventIdRoute: AppAppEventEventIdRouteWithChildren,
 }
 
