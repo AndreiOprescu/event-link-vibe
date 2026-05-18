@@ -1,106 +1,134 @@
-## What changes
+## Goal
 
-Voice notes, photos, and short videos become first-class messages in the room chat. They use the **exact same kind logic** as text: any of them can be sent as a **Discussion**, **Reply**, or **Global** message and behave identically (bubbles above heads grow with replies, threads expand under `more.../less...`, global replies prepend `/@Name`, etc.).
+Turn the existing `/app/event/$eventId/break` mock into a real **15-room break system** with seat-based occupancy, isolated chat, smart room matching, and a split-button entry from the event room.
 
-## Composer additions
+## 1. Break rooms — 15 purpose-named rooms
 
-The current composer keeps its text input and Discussion/Global buttons. Two new icon buttons sit to the left of the text input:
+Each room name describes what you go there to do. Hardcoded in `src/data/break.ts` (same set for every event). 4 seats each (you + up to 3 others).
 
 ```text
-[🎤 voice] [📷 camera]   __________________  
-                         [Discussion]  [Global]
+room-01  💬 Open Chat            casual room, anything goes
+room-02  🧠 Deep Discussion      slow, thoughtful threads
+room-03  🚀 Project Showcase     show what you're building
+room-04  🤝 Co-founder Match     find a co-founder
+room-05  🐛 Debug Together       paste code, get help
+room-06  💡 Idea Jam             brainstorm new ideas
+room-07  🎨 Design Critique      get feedback on UI/UX
+room-08  📣 Pitch Practice       rehearse your pitch
+room-09  📚 Learn & Teach        ask/answer "how do I…"
+room-10  🔌 API & Tools Talk     LLMs, integrations, stacks
+room-11  💸 Funding Chat         investors, grants, runway
+room-12  📈 Growth & Users       distribution, marketing
+room-13  ☕ Coffee Break         pure small talk, no work
+room-14  🧘 Quiet Room           low-volume, focus-friendly
+room-15  🌐 Hiring & Gigs        who's hiring / looking
 ```
 
-### Voice button (🎤)
-- Tap once → starts recording from the device mic via `navigator.mediaDevices.getUserMedia({ audio: true })` + `MediaRecorder`.
-- While recording, the composer is replaced by a recording strip: red dot, MM:SS timer, ✕ cancel, ⏹ stop. A live waveform (see below) animates as you speak.
-- Hard cap **2:00** — auto-stops at 120s.
-- On stop: inline preview shows the custom waveform player + duration. Discussion/Global buttons re-appear. Sending uploads the blob then inserts the message.
+Each room's name = its purpose, so a user reads the list and knows what kind of conversation lives there.
 
-### Camera button (📷)
-- Opens a full-screen capture sheet over the chat using `getUserMedia({ video: { facingMode: 'user' }, audio: <mode==='video'> })` rendered into a `<video>` element.
-- Sheet has a top toggle: **Photo / Video**.
-  - **Photo** mode: big shutter button → draws current video frame to `<canvas>`, exports JPEG blob.
-  - **Video** mode: tap-to-start, tap-to-stop via `MediaRecorder`, hard cap **15s**.
-- After capture: preview + Retake / Use. "Use" closes sheet, drops media into composer as pending attachment.
-- For photos and videos, a **caption** text field appears under the preview in the composer ("Add a caption…"). Caption is optional and goes into the existing `text` column. For videos, captions also work and render below the player.
-- All tracks `stop()`-ed when sheet closes (no orphan camera light).
+## 2. Preset goals (12) for smart matching
 
-### Pending media + reply mode
-- Only ONE pending media attachment at a time. Text input doubles as the caption.
-- When `replyTo` is set, the contextual single send button is used; kind is `reply`/`global`. A `/@Name` text caption is auto-prefilled; media-only (no caption) is allowed for replies too.
-- ✕ on the attachment chip drops the pending media.
+Replace freeform `profiles.goal` text with a chosen preset (stored as text key in existing `goal` column, no schema change). Used by the main button to pick a room with people who share your goal.
 
-## Audio waveform visualizations
+```text
+ship-mvp              🚀 Ship an MVP this weekend
+find-cofounder        🧠 Find an AI co-founder
+pair-designer         🎨 Pair with a designer
+pair-engineer         ⚙️ Pair with an engineer
+get-funding           💸 Get funding / find investors
+find-users            📈 Find early users
+learn-ai-tools        🧪 Learn new AI tools
+integrate-llms        🔌 Integrate LLM APIs
+build-agents          🤖 Build autonomous agents
+practice-demoing      🎙️ Practice demoing
+mentor-mentee         🧑‍🏫 Mentor / be mentored
+just-vibe             🍕 Just vibe & meet people
+```
 
-Custom lightweight waveform — no new dependencies, all built on Web Audio API + `<canvas>`.
+Exported as `BREAK_GOALS` from `src/data/break.ts`. Onboarding's goal field becomes a `<select>` driven by this list. Existing freeform goals fall back to `just-vibe` for matching.
 
-**Recording strip (live)**
-- While recording, an `AnalyserNode` from the mic stream feeds time-domain data into a small canvas at ~30fps. Rendered as ~32 vertical bars in lime, mirrored around centerline, smoothed with a tiny low-pass average. Replaces the static red-dot indicator.
+## 3. Presence + ephemeral chat — Supabase Realtime
 
-**Playback (recorded voice notes)**
-- On send, the recorded `Blob` is decoded **once** with `OfflineAudioContext.decodeAudioData`, downsampled to **64 amplitude buckets** (peak per bucket), stored as a JSON array in a new `event_messages.waveform_peaks` column.
-- `<VoiceMessage>` component renders those 64 bars in a canvas. Tap to play/pause; played-portion bars fill in lime, unplayed are muted-foreground. A thin progress cursor sweeps across as the underlying `<audio>` element ticks (no visible controls — the waveform IS the control). Duration pill (`0:12`) sits to the right.
-- Fallback: if `waveform_peaks` is null (legacy/decoding fail), render flat baseline + native `<audio controls>`.
+No new tables, no migrations.
 
-## Rendering
+- **Per-room channel**: `break:{eventId}:{roomId}`
+  - Presence payload: `{ profile_id, goal, joined_at, seat_index }`.
+  - On enter: subscribe, `track()` self with lowest free seat 0–3, render seats from `presence.sync`.
+  - On unmount / leave: `untrack()` + `removeChannel()`.
+  - Room full (4 present) → redirect back with toast "Room full — pick another".
+  - Chat via `broadcast`: `{ id, profile_id, text, ts }`, kept in local state capped at last 100, dropped on leave. No DB writes.
 
-`MessageRow` learns three new body shapes based on `media_type`:
-- `audio` → `<VoiceMessage>` (custom waveform player) + duration pill.
-- `image` → `<img>` capped at ~240px with click-to-zoom modal. **Caption** (if present) renders italic, muted-foreground, below the image — supports `/@Name` mention coloring just like text messages.
-- `video` → `<video controls playsinline>` capped at ~240px, with optional caption below in the same style as images.
+- **Aggregator channel** `break-index:{eventId}` for the picker: each room participant heartbeats `{ room_id, profile_id, goal }` every 10s. Picker subscribes only while open and computes `{ roomId: { count, goalCounts } }`. Stale entries (>20s) evicted client-side.
 
-**Discussion bubble above heads** (room floor): when active discussion's `media_type !== 'text'`, render icon-label instead of text snippet:
-- `🎤 Voice · 0:12`
-- `📷 Photo` (+ truncated caption if present, e.g. `📷 Photo · "view from the booth"`)
-- `🎬 Video · 0:08` (+ truncated caption if present)
+## 4. Routing
 
-Size-grows-with-replies logic stays the same.
+- New: `src/routes/_app.app.event.$eventId.break.$roomId.tsx` — the actual break room.
+- Existing `src/routes/_app.app.event.$eventId.break.tsx` → redirect to the smart-pick room (so old `Too crowded` link still works), falling back to `room-01` if snapshot is empty.
+- Top-right of break room: `← Back to the map` → `/app/event/$eventId`.
 
-**Global "replying to:" link**: when parent global is media, snippet becomes `🎤 Voice` / `📷 Photo: <caption>` / `🎬 Video: <caption>`.
+## 5. Split button in the event room
 
-## Data model
+Replace the current `Too crowded` link with a split control:
 
-Migration on `event_messages`:
-- Add `media_type text not null default 'text'` with check `media_type in ('text','audio','image','video')`.
-- Add `media_url text` (public storage URL).
-- Add `media_duration_seconds integer` (null for images).
-- Add `waveform_peaks jsonb` (null unless media_type='audio'; 64-number array).
-- `text` becomes nullable. Add check: `text is not null or media_type <> 'text'`.
+```text
+┌──────────────────────────┬───┐
+│ ☕ Too crowded             │ ▾ │
+└──────────────────────────┴───┘
+```
 
-New storage bucket `event-media` (public read):
-- Path: `event-media/{event_id}/{profile_id}/{uuid}.{ext}`.
-- RLS on `storage.objects`:
-  - Public SELECT on bucket `event-media`.
-  - INSERT allowed to authenticated users where `(storage.foldername(name))[2]` matches a profile id owned by `auth.uid()`, gated by a SECURITY DEFINER helper `public.owns_profile(profile_id uuid)`.
+- **Main half**: computes best room from the aggregator snapshot:
+  1. Filter rooms with `count < 4`.
+  2. Sort by `goalCounts[myGoal]` desc, then by `count` desc, then by room order.
+  3. Navigate there. If snapshot empty / all full → first room with `count < 4`; if all 15 full → toast "All break rooms are full".
+- **Arrow half** (`▾`): `Popover` listing all 15 rooms with emoji + purpose name, live `n/4` seat count (greyed at 4/4), and a small `· same goal` badge when ≥1 occupant shares your goal. Full rooms disabled.
 
-Upload flow: client uploads blob via `supabase.storage.from('event-media').upload(...)` → `getPublicUrl` → insert `event_messages` row with `media_type`, `media_url`, `media_duration_seconds`, `waveform_peaks` (audio only), `text` (caption or null), plus `kind`/`parent_id` from composer state.
+## 6. Break-room screen
 
-## Files touched
+Reuses the visual language of current `break.tsx` (round table, seats around it, chat panel at bottom), restyled for **4 seats** and themed per room:
 
-- `supabase/migrations/<new>.sql` — schema + bucket + policies above.
-- `src/integrations/supabase/types.ts` — auto-regenerated.
-- `src/routes/_app.app.event.$eventId.tsx`:
-  - Extend `Msg` type with `media_type`, `media_url`, `media_duration_seconds`, `waveform_peaks`.
-  - Add `useVoiceRecorder()` hook — `MediaRecorder` for audio + live `AnalyserNode` waveform.
-  - Add `computeWaveformPeaks(blob)` helper — `OfflineAudioContext` decode → 64 buckets.
-  - Add `<VoiceMessage>` component — canvas-based playback waveform with play/pause + progress.
-  - Add `<LiveWaveform>` component — canvas tied to the analyser during recording.
-  - Add `<CameraSheet>` component — full-screen photo/video capture.
-  - Add `<ImageLightbox>` component — click-to-zoom for images.
-  - Extend `RoomChat` composer with mic + camera buttons, pending-media state, caption input for photo/video.
-  - Extend `MessageRow` to render audio/image/video bodies + captions.
-  - Update floating discussion bubble + `findRepliedGlobalSnippet` to produce media labels (with caption when present).
+```text
+              ┌──────────────────────────┐
+              │   ← Back to the map      │
+              │   💬 Open Chat · 3/4     │
+              └──────────────────────────┘
 
-No new npm dependencies — `MediaRecorder`, `getUserMedia`, `OfflineAudioContext`, `AnalyserNode`, `<canvas>`.
+                       seat 0
+                         ⬤
+                    ┌─────────┐
+            seat 3  │  table  │ seat 1
+                ⬤   │   💬    │  ⬤
+                    └─────────┘
+                         ⬤
+                       seat 2
+
+   ┌────────────────────────────────────┐
+   │  chat (ephemeral, just this room)  │
+   └────────────────────────────────────┘
+```
+
+- Empty seats render as dashed circles labelled "open".
+- Filled seats show avatar (emoji + color from `profiles`), first name, goal chip. Hover opens the same side profile card pattern as current `break.tsx`.
+- Chat panel: identical input UX (Mic / Camera stay as visual placeholders — out of scope per "UI change, keep work in frontend"), but flows through the broadcast channel, not `event_messages`.
+- Unmount cleans up presence + channel; "Back to the map" and browser back both clean up.
+
+## 7. Files touched
+
+```text
+src/data/break.ts                                     [NEW]  BREAK_ROOMS (15 purpose-named), BREAK_GOALS (12), helpers
+src/components/app/BreakRoomPicker.tsx                [NEW]  split-button + popover, uses aggregator channel
+src/hooks/useBreakRoomIndex.ts                        [NEW]  subscribes to break-index:{eventId}
+src/routes/_app.app.event.$eventId.tsx                edit   swap Coffee Link for <BreakRoomPicker />
+src/routes/_app.app.event.$eventId.break.tsx         edit   redirect → smart-pick room
+src/routes/_app.app.event.$eventId.break.$roomId.tsx  [NEW]  the actual break room (presence + broadcast chat + 4 seats)
+src/routes/onboarding.tsx                             edit   goal input → <select> of BREAK_GOALS
+```
+
+No DB migration, no new dependencies — all Supabase Realtime, already wired.
 
 ## Out of scope (call out, don't build)
 
-- Image filters / cropping / editing before send.
-- Background blur, virtual cameras, or AR.
-- Transcription of voice notes.
-- Live-streaming a camera (this is capture-and-send, not live video chat).
-
-## Permissions UX
-
-If the user denies mic or camera permission, show a one-line toast under the composer: "Microphone access needed for voice messages" / "Camera access needed for photo & video". No retry loop; user re-triggers by tapping the button again.
+- Persisting break-room chat to DB (explicitly ephemeral per your choice).
+- Voice / camera / waveform inside break rooms — icons stay as visual placeholders so the look matches the main event room; full media flow stays scoped to the main event room.
+- Anti-abuse / kick / mute controls.
+- Cross-event room matching.
+- Migrating already-saved freeform goal strings on existing profiles (fall back to `just-vibe`; users can re-pick in onboarding).
