@@ -20,27 +20,39 @@ export type Database = {
           event_id: string
           id: string
           kind: string
+          media_duration_seconds: number | null
+          media_type: string
+          media_url: string | null
           parent_id: string | null
           profile_id: string
-          text: string
+          text: string | null
+          waveform_peaks: Json | null
         }
         Insert: {
           created_at?: string
           event_id: string
           id?: string
           kind?: string
+          media_duration_seconds?: number | null
+          media_type?: string
+          media_url?: string | null
           parent_id?: string | null
           profile_id: string
-          text: string
+          text?: string | null
+          waveform_peaks?: Json | null
         }
         Update: {
           created_at?: string
           event_id?: string
           id?: string
           kind?: string
+          media_duration_seconds?: number | null
+          media_type?: string
+          media_url?: string | null
           parent_id?: string | null
           profile_id?: string
-          text?: string
+          text?: string | null
+          waveform_peaks?: Json | null
         }
         Relationships: [
           {
@@ -155,7 +167,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      owns_profile: { Args: { _profile_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
