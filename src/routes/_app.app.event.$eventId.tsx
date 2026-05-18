@@ -194,6 +194,7 @@ function EventRoom() {
 
       {chatOpen && (
         <ChatDrawer
+          eventId={eventId}
           user={selectedUser}
           messages={messages}
           profileById={profileById}
