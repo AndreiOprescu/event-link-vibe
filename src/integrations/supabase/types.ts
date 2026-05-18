@@ -14,7 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      event_messages: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          profile_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          profile_id: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          profile_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_messages_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_messages_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          attendees: number
+          code: string
+          color: string
+          created_at: string
+          date_label: string
+          host: string
+          id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          attendees?: number
+          code: string
+          color?: string
+          created_at?: string
+          date_label: string
+          host: string
+          id: string
+          status: string
+          title: string
+        }
+        Update: {
+          attendees?: number
+          code?: string
+          color?: string
+          created_at?: string
+          date_label?: string
+          host?: string
+          id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          color: string
+          company: string | null
+          created_at: string
+          display_name: string
+          email: string | null
+          emoji: string
+          goal: string | null
+          id: string
+          is_demo: boolean
+          linkedin: string | null
+          role: string | null
+          track: string | null
+          user_id: string | null
+        }
+        Insert: {
+          color?: string
+          company?: string | null
+          created_at?: string
+          display_name: string
+          email?: string | null
+          emoji?: string
+          goal?: string | null
+          id?: string
+          is_demo?: boolean
+          linkedin?: string | null
+          role?: string | null
+          track?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          color?: string
+          company?: string | null
+          created_at?: string
+          display_name?: string
+          email?: string | null
+          emoji?: string
+          goal?: string | null
+          id?: string
+          is_demo?: boolean
+          linkedin?: string | null
+          role?: string | null
+          track?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
