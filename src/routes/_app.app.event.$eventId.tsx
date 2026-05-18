@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AvatarBubble } from "@/components/app/AvatarBubble";
 import {
-  ArrowLeft, Coffee, Mail, Linkedin, Send, MessageCircle, X, CornerDownRight, Globe2,
+  ArrowLeft, Mail, Linkedin, Send, MessageCircle, X, CornerDownRight, Globe2,
   Mic, Camera, Play, Pause, Square, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/hooks/useAuth";
+import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 
 export const Route = createFileRoute("/_app/app/event/$eventId")({
   head: () => ({ meta: [{ title: "Event room — EventLabs" }] }),
