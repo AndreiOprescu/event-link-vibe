@@ -652,6 +652,7 @@ function ProfileDrawer({
             <MessageCircle className="h-4 w-4" /> Start a conversation with {p.display_name.split(" ")[0]}!
           </button>
         )}
+        </div>
       </div>
     </div>
   );
