@@ -51,17 +51,15 @@ function Onboarding() {
     setAvatarUrl(profile.avatar_url ?? null);
   }, [profile]);
 
-  const uploadFile = useCallback(async (file: File) => {
+  const uploadBlob = useCallback(async (blob: Blob, ext: string, contentType: string) => {
     if (!user || !profile) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
+    if (blob.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `avatars/${user.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("event-media")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, blob, { upsert: true, contentType });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("event-media").getPublicUrl(path);
       setAvatarUrl(pub.publicUrl);
@@ -75,7 +73,10 @@ function Onboarding() {
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) await uploadFile(file);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    await uploadBlob(file, ext, file.type);
   };
 
   const finish = async () => {
