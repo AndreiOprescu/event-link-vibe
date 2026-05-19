@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Camera, ImageIcon, Loader2, Smile } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CameraModal } from "@/components/app/CameraModal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/onboarding")({
