@@ -63,7 +63,7 @@ export function ChatSwitcher({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-sm font-semibold">
                 Room chat
-                {items.roomUnread > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--coral,_#F26A4F)]" style={{ background: "hsl(var(--lime))" }} />}
+                {items.roomUnread > 0 && <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-lime px-1 text-[9px] font-bold text-primary-foreground">{items.roomUnread}</span>}
               </div>
               <div className="text-[10px] text-muted-foreground">Everyone in this event</div>
             </div>
