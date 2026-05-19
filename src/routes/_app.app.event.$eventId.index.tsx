@@ -100,6 +100,72 @@ function EventRoom() {
     return () => { supabase.removeChannel(ch); };
   }, [eventId]);
 
+  // Load direct messages I'm a participant in for this event + read receipts
+  useEffect(() => {
+    if (!me) return;
+    supabase
+      .from("direct_messages")
+      .select("*")
+      .eq("event_id", eventId)
+      .or(`sender_profile_id.eq.${me.id},recipient_profile_id.eq.${me.id}`)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => setDmRows((data ?? []) as DMRow[]));
+    supabase
+      .from("chat_reads")
+      .select("scope,peer_profile_id,last_read_at")
+      .eq("profile_id", me.id)
+      .eq("event_id", eventId)
+      .then(({ data }) => {
+        const dm = new Map<string, string>();
+        let room: string | null = null;
+        (data ?? []).forEach((r: any) => {
+          if (r.scope === "room") room = r.last_read_at;
+          else if (r.scope === "dm" && r.peer_profile_id) dm.set(r.peer_profile_id, r.last_read_at);
+        });
+        setReads({ room, dm });
+      });
+  }, [eventId, me?.id]);
+
+  // Realtime DMs for me in this event
+  useEffect(() => {
+    if (!me) return;
+    const ch = supabase
+      .channel(`event-${eventId}-dm-${me.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "direct_messages", filter: `event_id=eq.${eventId}` },
+        (payload) => {
+          const row = payload.new as DMRow;
+          if (row.sender_profile_id !== me.id && row.recipient_profile_id !== me.id) return;
+          setDmRows((rs) => (rs.some((x) => x.id === row.id) ? rs : [...rs, row]));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, me?.id]);
+
+  const markRead = async (target: ChatTarget) => {
+    if (!me) return;
+    const now = new Date().toISOString();
+    if (target.kind === "room") {
+      setReads((r) => ({ ...r, room: now }));
+      await supabase.from("chat_reads").upsert(
+        { profile_id: me.id, event_id: eventId, scope: "room", peer_profile_id: null, last_read_at: now },
+        { onConflict: "profile_id,event_id,scope,peer_profile_id" }
+      );
+    } else {
+      setReads((r) => {
+        const dm = new Map(r.dm);
+        dm.set(target.peerId, now);
+        return { ...r, dm };
+      });
+      await supabase.from("chat_reads").upsert(
+        { profile_id: me.id, event_id: eventId, scope: "dm", peer_profile_id: target.peerId, last_read_at: now },
+        { onConflict: "profile_id,event_id,scope,peer_profile_id" }
+      );
+    }
+  };
+
   // Realtime presence: track who is currently in this event
   useEffect(() => {
     if (!me) return;
