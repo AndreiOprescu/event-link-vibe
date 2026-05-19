@@ -60,6 +60,25 @@ function EventRoom() {
       });
   }, [eventId]);
 
+  // Load event_members (used both to know if I need intake, and to show others' intro videos)
+  const loadMembers = (uid?: string) => {
+    supabase
+      .from("event_members")
+      .select("user_id,event_id,goal,intro,intro_video_url,intro_duration_seconds")
+      .eq("event_id", eventId)
+      .then(({ data }) => {
+        const m = new Map<string, Member>();
+        (data ?? []).forEach((row: any) => m.set(row.user_id, row as Member));
+        setMembers(m);
+        if (uid !== undefined) setMemberLoaded(true);
+      });
+  };
+  useEffect(() => {
+    if (!user) return;
+    loadMembers(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, user?.id]);
+
   // Realtime: new chat messages
   useEffect(() => {
     const ch = supabase
