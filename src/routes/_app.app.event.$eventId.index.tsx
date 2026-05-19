@@ -28,9 +28,7 @@ function EventRoom() {
   const { eventId } = Route.useParams();
   const { profile: me, user } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
-  const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
-  const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
-  const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<Profile[]>([]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
