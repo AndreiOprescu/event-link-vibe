@@ -512,7 +512,23 @@ function EventRoom() {
           eventId={eventId}
           userId={user.id}
           onClose={() => setRecorderOpen(false)}
-          onSaved={() => { setRecorderOpen(false); loadMembers(user.id); }}
+          onSaved={(url, durationSec) => {
+            setMembersByUserId((prev) => {
+              const next = new Map(prev);
+              const existing = next.get(user.id);
+              next.set(user.id, {
+                user_id: user.id,
+                event_id: eventId,
+                goal: existing?.goal ?? "",
+                intro: existing?.intro ?? "",
+                intro_video_url: url,
+                intro_duration_seconds: durationSec,
+              });
+              return next;
+            });
+            setRecorderOpen(false);
+            loadMembers(user.id);
+          }}
         />
       )}
     </div>
