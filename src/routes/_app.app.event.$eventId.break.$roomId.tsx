@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Linkedin, Mail, Send, X } from "lucide-react";
+import { ArrowLeft, Linkedin, Mail, MessageCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/hooks/useAuth";
 import { BREAK_GOALS, BREAK_SEATS_PER_ROOM, getRoom, normalizeGoal } from "@/data/break";
 import { useBreakRoomHeartbeat } from "@/hooks/useBreakRoomIndex";
+import { RoomChat, type Msg } from "@/components/app/RoomChat";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/break/$roomId")({
@@ -19,13 +20,6 @@ type SeatOccupant = {
   seat_index: number;
 };
 
-type ChatMsg = {
-  id: string;
-  profile_id: string;
-  text: string;
-  ts: number;
-};
-
 function goalLabel(id: string) {
   return BREAK_GOALS.find((g) => g.id === id);
 }
@@ -38,9 +32,9 @@ function BreakRoom() {
 
   const [occupants, setOccupants] = useState<SeatOccupant[]>([]);
   const [profilesMap, setProfilesMap] = useState<Record<string, Profile>>({});
-  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
-  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const mySeatRef = useRef<number | null>(null);
 
   const myGoal = normalizeGoal(me?.goal);
@@ -48,12 +42,12 @@ function BreakRoom() {
   // Heartbeat into the aggregator so pickers see this room's count.
   useBreakRoomHeartbeat({ eventId, roomId, profileId: me?.id, goal: myGoal });
 
-  // Per-room presence + broadcast.
+  // Per-room presence (seat tracking only).
   useEffect(() => {
     if (!me || !room) return;
     let cancelled = false;
     const channel = supabase.channel(`break:${eventId}:${roomId}`, {
-      config: { presence: { key: me.id }, broadcast: { self: false } },
+      config: { presence: { key: me.id } },
     });
 
     const pickSeat = (state: Record<string, SeatOccupant[]>): number => {
@@ -73,7 +67,6 @@ function BreakRoom() {
       for (const k of Object.keys(state)) {
         for (const m of state[k]) flat.push(m);
       }
-      // Dedupe by profile_id (keep earliest seat_index).
       const byProfile = new Map<string, SeatOccupant>();
       for (const o of flat) {
         const prev = byProfile.get(o.profile_id);
@@ -85,10 +78,6 @@ function BreakRoom() {
     channel.on("presence", { event: "sync" }, syncOccupants);
     channel.on("presence", { event: "join" }, syncOccupants);
     channel.on("presence", { event: "leave" }, syncOccupants);
-    channel.on("broadcast", { event: "msg" }, (payload) => {
-      const m = payload.payload as ChatMsg;
-      setMsgs((cur) => [...cur.slice(-99), m]);
-    });
 
     channel.subscribe(async (status) => {
       if (cancelled || status !== "SUBSCRIBED") return;
@@ -115,9 +104,42 @@ function BreakRoom() {
     };
   }, [eventId, roomId, me, myGoal, room, navigate]);
 
-  // Fetch profile rows for any occupants we don't have yet.
+  // Per-room message fetch + realtime, scoped to room_id.
   useEffect(() => {
-    const missing = occupants.map((o) => o.profile_id).filter((id) => !profilesMap[id]);
+    supabase
+      .from("event_messages")
+      .select("*")
+      .eq("event_id", eventId)
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        setMessages((data ?? []) as unknown as Msg[]);
+      });
+  }, [eventId, roomId]);
+
+  useEffect(() => {
+    const ch = supabase
+      .channel(`event-${eventId}-${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "event_messages", filter: `event_id=eq.${eventId}` },
+        (payload) => {
+          const row = payload.new as unknown as Msg;
+          if (row.room_id !== roomId) return;
+          setMessages((m) => [...m, row]);
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, roomId]);
+
+  // Fetch profile rows for any occupants OR message authors we don't have yet.
+  useEffect(() => {
+    const needed = new Set<string>();
+    occupants.forEach((o) => needed.add(o.profile_id));
+    messages.forEach((m) => needed.add(m.profile_id));
+    if (me) needed.delete(me.id);
+    const missing = [...needed].filter((id) => !profilesMap[id]);
     if (missing.length === 0) return;
     supabase
       .from("profiles")
@@ -131,7 +153,14 @@ function BreakRoom() {
           return next;
         });
       });
-  }, [occupants, profilesMap]);
+  }, [occupants, messages, profilesMap, me]);
+
+  const profileById = useMemo(() => {
+    const map = new Map<string, Profile>();
+    Object.values(profilesMap).forEach((p) => map.set(p.id, p));
+    if (me) map.set(me.id, me);
+    return map;
+  }, [profilesMap, me]);
 
   // Build seat array (4 slots, undefined when empty).
   const seats = useMemo(() => {
@@ -141,23 +170,6 @@ function BreakRoom() {
     }
     return arr;
   }, [occupants]);
-
-  const sendMessage = () => {
-    if (!draft.trim() || !me) return;
-    const msg: ChatMsg = {
-      id: crypto.randomUUID(),
-      profile_id: me.id,
-      text: draft.trim(),
-      ts: Date.now(),
-    };
-    setMsgs((cur) => [...cur.slice(-99), msg]);
-    supabase.channel(`break:${eventId}:${roomId}`).send({
-      type: "broadcast",
-      event: "msg",
-      payload: msg,
-    });
-    setDraft("");
-  };
 
   if (!room) {
     return (
@@ -233,7 +245,7 @@ function BreakRoom() {
                 </div>
               );
             }
-            const p = profilesMap[occ.profile_id];
+            const p = profilesMap[occ.profile_id] ?? (me && occ.profile_id === me.id ? me : undefined);
             const isMe = me && occ.profile_id === me.id;
             const goal = goalLabel(occ.goal);
             return (
@@ -268,71 +280,19 @@ function BreakRoom() {
         </div>
       </div>
 
-      {/* Chat panel */}
-      <div className="absolute inset-x-0 bottom-0 z-30 px-4 pb-4">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-border bg-background/90 p-4 shadow-card backdrop-blur-xl">
-          <div className="mb-3 max-h-40 space-y-2 overflow-y-auto">
-            {msgs.length === 0 ? (
-              <div className="py-2 text-center text-xs text-muted-foreground">
-                Chat is just for this room — say hi 👋
-              </div>
-            ) : (
-              msgs.map((m) => {
-                const p = profilesMap[m.profile_id];
-                const mine = me && m.profile_id === me.id;
-                return (
-                  <div key={m.id} className={`flex items-start gap-2 ${mine ? "justify-end" : ""}`}>
-                    {!mine && (
-                      <div
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs"
-                        style={{ backgroundColor: p?.color ?? "#A3E635" }}
-                      >
-                        {p?.emoji ?? "👤"}
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[70%] rounded-2xl px-3 py-1.5 text-sm ${
-                        mine ? "bg-lime text-primary-foreground" : "bg-surface"
-                      }`}
-                    >
-                      {!mine && (
-                        <div className="text-[10px] font-semibold opacity-70">
-                          {p?.display_name?.split(" ")[0] ?? "guest"}
-                        </div>
-                      )}
-                      {m.text}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder={`Say something in ${room.name}…`}
-              className="flex-1 rounded-full bg-surface px-4 py-2 text-sm outline-none"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!draft.trim()}
-              className="rounded-full bg-lime p-2 text-primary-foreground disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Open chat FAB — same as main map */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="absolute bottom-6 right-6 z-30 flex items-center gap-2 rounded-full bg-lime px-5 py-3 text-sm font-semibold text-primary-foreground shadow-glow hover:scale-[1.03]"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Room chat
+        </button>
+      )}
 
       {/* Side profile */}
-      {selected && selectedProfile && selectedProfile.id !== me?.id && (
+      {selected && selectedProfile && selectedProfile.id !== me?.id && !chatOpen && (
         <div className="absolute right-4 top-20 z-40 w-72 rounded-2xl border border-border bg-popover p-5 shadow-card">
           <button onClick={() => setSelected(null)} className="absolute right-3 top-3 text-muted-foreground">
             <X className="h-4 w-4" />
@@ -373,6 +333,19 @@ function BreakRoom() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Persisted, per-room chat panel with replies + voice + image + video */}
+      {chatOpen && (
+        <RoomChat
+          eventId={eventId}
+          roomId={roomId}
+          messages={messages}
+          profileById={profileById}
+          me={me}
+          focusDiscussionId={null}
+          onClose={() => setChatOpen(false)}
+        />
       )}
     </div>
   );

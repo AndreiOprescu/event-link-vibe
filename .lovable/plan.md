@@ -1,95 +1,50 @@
 ## Goal
 
-Turn the existing `/app/event/$eventId/break` mock into a real **15-room break system** with seat-based occupancy, isolated chat, smart room matching, and a split-button entry from the event room.
+Keep the existing round-table-with-4-seats layout in the break room, but upgrade the chat to full parity with the main event (persisted via `event_messages`, scoped per room, with replies and voice/image/video). The split-button entry already routes correctly.
 
-## 1. Break rooms — 15 purpose-named rooms
+## 1. Schema — add `room_id` to `event_messages`
 
-Each room name describes what you go there to do. Hardcoded in `src/data/break.ts` (same set for every event). 4 seats each (you + up to 3 others).
+Single migration. Nullable text column; `NULL` = main map (every existing row stays on the main map).
 
-```text
-room-01  💬 Open Chat            casual room, anything goes
-room-02  🧠 Deep Discussion      slow, thoughtful threads
-room-03  🚀 Project Showcase     show what you're building
-room-04  🤝 Co-founder Match     find a co-founder
-room-05  🐛 Debug Together       paste code, get help
-room-06  💡 Idea Jam             brainstorm new ideas
-room-07  🎨 Design Critique      get feedback on UI/UX
-room-08  📣 Pitch Practice       rehearse your pitch
-room-09  📚 Learn & Teach        ask/answer "how do I…"
-room-10  🔌 API & Tools Talk     LLMs, integrations, stacks
-room-11  💸 Funding Chat         investors, grants, runway
-room-12  📈 Growth & Users       distribution, marketing
-room-13  ☕ Coffee Break         pure small talk, no work
-room-14  🧘 Quiet Room           low-volume, focus-friendly
-room-15  🌐 Hiring & Gigs        who's hiring / looking
+```sql
+ALTER TABLE public.event_messages
+  ADD COLUMN room_id TEXT NULL;
+
+CREATE INDEX event_messages_event_room_idx
+  ON public.event_messages (event_id, room_id, created_at);
 ```
 
-Each room's name = its purpose, so a user reads the list and knows what kind of conversation lives there.
+No RLS change needed — existing `select true` / `insert own profile` policies already cover the new column.
 
-## 2. Preset goals (12) for smart matching
+## 2. Extract `RoomChat` into a shared component
 
-Replace freeform `profiles.goal` text with a chosen preset (stored as text key in existing `goal` column, no schema change). Used by the main button to pick a room with people who share your goal.
-
-```text
-ship-mvp              🚀 Ship an MVP this weekend
-find-cofounder        🧠 Find an AI co-founder
-pair-designer         🎨 Pair with a designer
-pair-engineer         ⚙️ Pair with an engineer
-get-funding           💸 Get funding / find investors
-find-users            📈 Find early users
-learn-ai-tools        🧪 Learn new AI tools
-integrate-llms        🔌 Integrate LLM APIs
-build-agents          🤖 Build autonomous agents
-practice-demoing      🎙️ Practice demoing
-mentor-mentee         🧑‍🏫 Mentor / be mentored
-just-vibe             🍕 Just vibe & meet people
-```
-
-Exported as `BREAK_GOALS` from `src/data/break.ts`. Onboarding's goal field becomes a `<select>` driven by this list. Existing freeform goals fall back to `just-vibe` for matching.
-
-## 3. Presence + ephemeral chat — Supabase Realtime
-
-No new tables, no migrations.
-
-- **Per-room channel**: `break:{eventId}:{roomId}`
-  - Presence payload: `{ profile_id, goal, joined_at, seat_index }`.
-  - On enter: subscribe, `track()` self with lowest free seat 0–3, render seats from `presence.sync`.
-  - On unmount / leave: `untrack()` + `removeChannel()`.
-  - Room full (4 present) → redirect back with toast "Room full — pick another".
-  - Chat via `broadcast`: `{ id, profile_id, text, ts }`, kept in local state capped at last 100, dropped on leave. No DB writes.
-
-- **Aggregator channel** `break-index:{eventId}` for the picker: each room participant heartbeats `{ room_id, profile_id, goal }` every 10s. Picker subscribes only while open and computes `{ roomId: { count, goalCounts } }`. Stale entries (>20s) evicted client-side.
-
-## 4. Routing
-
-- New: `src/routes/_app.app.event.$eventId.break.$roomId.tsx` — the actual break room.
-- Existing `src/routes/_app.app.event.$eventId.break.tsx` → redirect to the smart-pick room (so old `Too crowded` link still works), falling back to `room-01` if snapshot is empty.
-- Top-right of break room: `← Back to the map` → `/app/event/$eventId`.
-
-## 5. Split button in the event room
-
-Replace the current `Too crowded` link with a split control:
+Pull the existing `RoomChat` + media helpers (`uploadEventMedia`, `computeWaveformPeaks`, `useVoiceRecorder`) out of `src/routes/_app.app.event.$eventId.tsx` into:
 
 ```text
-┌──────────────────────────┬───┐
-│ ☕ Too crowded             │ ▾ │
-└──────────────────────────┴───┘
+src/components/app/RoomChat.tsx        [NEW]  the chat panel + media + replies
+src/lib/event-media.ts                 [NEW]  upload + waveform helpers
 ```
 
-- **Main half**: computes best room from the aggregator snapshot:
-  1. Filter rooms with `count < 4`.
-  2. Sort by `goalCounts[myGoal]` desc, then by `count` desc, then by room order.
-  3. Navigate there. If snapshot empty / all full → first room with `count < 4`; if all 15 full → toast "All break rooms are full".
-- **Arrow half** (`▾`): `Popover` listing all 15 rooms with emoji + purpose name, live `n/4` seat count (greyed at 4/4), and a small `· same goal` badge when ≥1 occupant shares your goal. Full rooms disabled.
+`RoomChat` gains a `roomId: string | null` prop:
+- Initial fetch: `.eq("event_id", eventId).eq("room_id", roomId)` (use `.is("room_id", null)` when `roomId === null`).
+- Realtime: subscribe to `event-${eventId}-${roomId ?? "main"}` and filter inserts by `room_id`.
+- Inserts include `room_id: roomId` in the payload.
 
-## 6. Break-room screen
+Main map route swaps its inline `<RoomChat …/>` for `<RoomChat eventId={eventId} roomId={null} … />`. Behaviour on the main map is unchanged.
 
-Reuses the visual language of current `break.tsx` (round table, seats around it, chat panel at bottom), restyled for **4 seats** and themed per room:
+## 3. Break-room route — keep the table, upgrade the chat
+
+`src/routes/_app.app.event.$eventId.break.$roomId.tsx`:
+
+- **Keep**: round table in the center, 4 seats around it, presence-driven seat assignment (`pickSeat` lowest-free 0–3), full-room redirect + toast, heartbeat into the aggregator, hover/side profile card.
+- **Replace** the bottom ephemeral chat input with `<RoomChat eventId={eventId} roomId={roomId} … />`. Same component, same Mic / Camera / Image / reply UI as the main map.
+- Remove the ephemeral `ChatMsg` state, `broadcast`-based `msg` events, and the local `<input>` chat box. Presence channel stays for seat tracking only.
+- Top bar unchanged (`← Back to the map`, `{emoji} {name} · n/4`, blurb).
 
 ```text
               ┌──────────────────────────┐
-              │   ← Back to the map      │
-              │   💬 Open Chat · 3/4     │
+              │  ← Back to the map       │
+              │  💬 Open Chat · 3/4      │
               └──────────────────────────┘
 
                        seat 0
@@ -101,34 +56,26 @@ Reuses the visual language of current `break.tsx` (round table, seats around it,
                          ⬤
                        seat 2
 
-   ┌────────────────────────────────────┐
-   │  chat (ephemeral, just this room)  │
-   └────────────────────────────────────┘
+           [ 💬 Room chat ]  ← FAB opens shared RoomChat
 ```
 
-- Empty seats render as dashed circles labelled "open".
-- Filled seats show avatar (emoji + color from `profiles`), first name, goal chip. Hover opens the same side profile card pattern as current `break.tsx`.
-- Chat panel: identical input UX (Mic / Camera stay as visual placeholders — out of scope per "UI change, keep work in frontend"), but flows through the broadcast channel, not `event_messages`.
-- Unmount cleans up presence + channel; "Back to the map" and browser back both clean up.
+Chat opens as the same panel as the main map (replies, voice, image, video, waveform), but messages are filtered to `room_id = roomId` and only visible inside this break room.
 
-## 7. Files touched
+## 4. Files touched
 
 ```text
-src/data/break.ts                                     [NEW]  BREAK_ROOMS (15 purpose-named), BREAK_GOALS (12), helpers
-src/components/app/BreakRoomPicker.tsx                [NEW]  split-button + popover, uses aggregator channel
-src/hooks/useBreakRoomIndex.ts                        [NEW]  subscribes to break-index:{eventId}
-src/routes/_app.app.event.$eventId.tsx                edit   swap Coffee Link for <BreakRoomPicker />
-src/routes/_app.app.event.$eventId.break.tsx         edit   redirect → smart-pick room
-src/routes/_app.app.event.$eventId.break.$roomId.tsx  [NEW]  the actual break room (presence + broadcast chat + 4 seats)
-src/routes/onboarding.tsx                             edit   goal input → <select> of BREAK_GOALS
+supabase/migrations/<ts>_event_messages_room_id.sql              [NEW]  ALTER TABLE + index
+src/lib/event-media.ts                                           [NEW]  uploadEventMedia + computeWaveformPeaks (moved)
+src/components/app/RoomChat.tsx                                  [NEW]  extracted chat panel, takes roomId prop
+src/routes/_app.app.event.$eventId.tsx                           edit   use shared <RoomChat roomId={null}/>
+src/routes/_app.app.event.$eventId.break.$roomId.tsx             edit   keep table+seats, mount <RoomChat roomId={roomId}/>
 ```
 
-No DB migration, no new dependencies — all Supabase Realtime, already wired.
+`BreakRoomPicker`, `useBreakRoomIndex`, `useBreakRoomHeartbeat`, the smart-pick redirect, and `src/data/break.ts` stay untouched.
 
-## Out of scope (call out, don't build)
+## Out of scope
 
-- Persisting break-room chat to DB (explicitly ephemeral per your choice).
-- Voice / camera / waveform inside break rooms — icons stay as visual placeholders so the look matches the main event room; full media flow stays scoped to the main event room.
-- Anti-abuse / kick / mute controls.
-- Cross-event room matching.
-- Migrating already-saved freeform goal strings on existing profiles (fall back to `just-vibe`; users can re-pick in onboarding).
+- Migrating existing rows into break rooms (all existing messages stay `room_id = NULL` → main map).
+- Drifting avatars / discussion bubbles in the break room (seats stay fixed at the table).
+- Showing per-room message counts in the picker (still `n/4` seats).
+- Anti-abuse / kick / mute.

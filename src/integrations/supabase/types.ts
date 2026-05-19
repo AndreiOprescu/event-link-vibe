@@ -25,6 +25,7 @@ export type Database = {
           media_url: string | null
           parent_id: string | null
           profile_id: string
+          room_id: string | null
           text: string | null
           waveform_peaks: Json | null
         }
@@ -38,6 +39,7 @@ export type Database = {
           media_url?: string | null
           parent_id?: string | null
           profile_id: string
+          room_id?: string | null
           text?: string | null
           waveform_peaks?: Json | null
         }
@@ -51,6 +53,7 @@ export type Database = {
           media_url?: string | null
           parent_id?: string | null
           profile_id?: string
+          room_id?: string | null
           text?: string | null
           waveform_peaks?: Json | null
         }
