@@ -22,7 +22,9 @@ function EventRoom() {
   const { eventId } = Route.useParams();
   const { profile: me } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
+  const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
+  const [presentIds, setPresentIds] = useState<string[]>([]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -31,7 +33,7 @@ function EventRoom() {
 
   useEffect(() => {
     supabase.from("events").select("*").eq("id", eventId).maybeSingle().then(({ data }) => setEvent(data as EventRow | null));
-    supabase.from("profiles").select("*").eq("is_demo", true).then(({ data }) => setProfiles((data ?? []) as Profile[]));
+    supabase.from("profiles").select("*").eq("is_demo", true).then(({ data }) => setDemoProfiles((data ?? []) as Profile[]));
     supabase
       .from("event_messages")
       .select("*")
@@ -43,6 +45,7 @@ function EventRoom() {
       });
   }, [eventId]);
 
+  // Realtime: new chat messages
   useEffect(() => {
     const ch = supabase
       .channel(`event-${eventId}-main`)
@@ -55,22 +58,91 @@ function EventRoom() {
     return () => { supabase.removeChannel(ch); };
   }, [eventId]);
 
-  const positions = useMemo<Record<string, Position>>(() => {
-    const out: Record<string, Position> = {};
-    profiles.forEach((p, i) => {
-      const seed = (i * 9301 + 49297) % 233280;
-      out[p.id] = { x: 8 + ((seed % 100) / 100) * 84, y: 18 + (((seed * 7) % 100) / 100) * 70 };
+  // Realtime presence: track who is currently in this event
+  useEffect(() => {
+    if (!me) return;
+    const ch = supabase.channel(`event-${eventId}-presence`, {
+      config: { presence: { key: me.id } },
     });
-    if (me) out[me.id] = { x: 48, y: 50 };
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState();
+      setPresentIds(Object.keys(state));
+    });
+    ch.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ profile_id: me.id, online_at: new Date().toISOString() });
+      }
+    });
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, me?.id]);
+
+  // Fetch profile rows for present users (other than me)
+  useEffect(() => {
+    const others = presentIds.filter((id) => id && id !== me?.id);
+    if (others.length === 0) { setPresentProfiles([]); return; }
+    supabase.from("profiles").select("*").in("id", others).then(({ data }) => {
+      setPresentProfiles((data ?? []) as Profile[]);
+    });
+  }, [presentIds.join("|"), me?.id]);
+
+  // Merge everyone we need to render: demo + present users + me. Dedup by id.
+  const allPeople = useMemo<Profile[]>(() => {
+    const map = new Map<string, Profile>();
+    demoProfiles.forEach((p) => map.set(p.id, p));
+    presentProfiles.forEach((p) => map.set(p.id, p));
+    if (me) map.set(me.id, me);
+    return Array.from(map.values());
+  }, [demoProfiles, presentProfiles, me]);
+
+  // Cluster people into small groups around fixed seating areas — like a real room.
+  const positions = useMemo<Record<string, Position>>(() => {
+    const centers = [
+      { x: 22, y: 30 },
+      { x: 50, y: 24 },
+      { x: 78, y: 32 },
+      { x: 26, y: 66 },
+      { x: 56, y: 74 },
+      { x: 80, y: 60 },
+      { x: 38, y: 48 },
+      { x: 68, y: 50 },
+    ];
+    // Stable order: keep me anchored to a center, fill clusters left-to-right.
+    const ordered = [...allPeople].sort((a, b) => {
+      if (me && a.id === me.id) return -1;
+      if (me && b.id === me.id) return 1;
+      return a.id.localeCompare(b.id);
+    });
+    const groups: string[][] = centers.map(() => []);
+    ordered.forEach((p, i) => {
+      const c = Math.floor(i / 3) % centers.length;
+      groups[c].push(p.id);
+    });
+    const out: Record<string, Position> = {};
+    groups.forEach((ids, ci) => {
+      const center = centers[ci];
+      const n = ids.length;
+      const radius = n <= 1 ? 0 : n === 2 ? 7 : 9;
+      const startAngle = ci * 1.1;
+      ids.forEach((id, k) => {
+        if (n === 1) {
+          out[id] = { x: center.x, y: center.y };
+          return;
+        }
+        const angle = startAngle + (k / n) * Math.PI * 2;
+        out[id] = {
+          x: center.x + Math.cos(angle) * radius,
+          y: center.y + Math.sin(angle) * radius * 0.65,
+        };
+      });
+    });
     return out;
-  }, [profiles, me]);
+  }, [allPeople, me]);
 
   const profileById = useMemo(() => {
     const m = new Map<string, Profile>();
-    profiles.forEach((p) => m.set(p.id, p));
-    if (me) m.set(me.id, me);
+    allPeople.forEach((p) => m.set(p.id, p));
     return m;
-  }, [profiles, me]);
+  }, [allPeople]);
 
   const replyCount = useMemo(() => {
     const c = new Map<string, number>();
@@ -112,7 +184,7 @@ function EventRoom() {
             <span className="text-foreground">{event.title}</span>
             <span className="ml-2 flex items-center gap-1 text-lime">
               <span className="h-1.5 w-1.5 rounded-full bg-lime pulse-lime" />
-              {profiles.length + 1}
+              {allPeople.length}
             </span>
           </div>
         )}
@@ -121,9 +193,10 @@ function EventRoom() {
 
       {/* Room floor */}
       <div className="tile-floor absolute inset-0">
-        {profiles.map((a) => {
+        {allPeople.map((a) => {
           const p = positions[a.id];
           if (!p) return null;
+          const isMe = me?.id === a.id;
           const disc = activeDiscussionByProfile.get(a.id);
           const count = disc ? replyCount.get(disc.id) ?? 0 : 0;
           const bubbleSize = Math.min(140, 48 + count * 8);
@@ -135,14 +208,16 @@ function EventRoom() {
               key={a.id}
               className="absolute"
               style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -50%)" }}
-              onMouseEnter={() => setHover(a.id)}
+              onMouseEnter={() => !isMe && setHover(a.id)}
               onMouseLeave={() => setHover(null)}
             >
               <div className="drift" style={{ animationDelay: `${delay}s`, animationDuration: `${duration}s` }}>
                 {disc && (
                   <button
                     onClick={() => openThread(disc.id)}
-                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-border bg-popover px-3 py-1.5 text-xs shadow-card transition hover:border-lime hover:scale-105"
+                    className={`absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border px-3 py-1.5 text-xs transition hover:scale-105 ${
+                      isMe ? "border-lime/50 bg-popover shadow-glow" : "border-border bg-popover shadow-card hover:border-lime"
+                    }`}
                     style={{ minWidth: bubbleSize, maxWidth: 240 }}
                     title={`${count} repl${count === 1 ? "y" : "ies"}`}
                   >
@@ -156,48 +231,26 @@ function EventRoom() {
                     )}
                   </button>
                 )}
-                <div className="bubble-halo">
-                  <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }} size={56} label onClick={() => setSelected(a.id)} />
+                <div className={isMe ? "bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background" : "bubble-halo"}>
+                  <AvatarBubble
+                    user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }}
+                    size={isMe ? 64 : 56}
+                    label={!isMe}
+                    onClick={isMe ? undefined : () => setSelected(a.id)}
+                  />
                 </div>
-                {hover === a.id && <HoverCard p={a} />}
+                {isMe && me && (
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime" />
+                    <span className="max-w-[100px] truncate text-[11px] font-semibold text-foreground">{me.display_name}</span>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-lime">you</span>
+                  </div>
+                )}
+                {!isMe && hover === a.id && <HoverCard p={a} />}
               </div>
             </div>
           );
         })}
-
-        {me && positions[me.id] && (() => {
-          const disc = activeDiscussionByProfile.get(me.id);
-          const count = disc ? replyCount.get(disc.id) ?? 0 : 0;
-          const bubbleSize = Math.min(140, 48 + count * 8);
-          return (
-            <div className="absolute" style={{ left: `${positions[me.id].x}%`, top: `${positions[me.id].y}%`, transform: "translate(-50%, -50%)" }}>
-              <div className="drift" style={{ animationDelay: "-1.5s", animationDuration: "7s" }}>
-                {disc && (
-                  <button
-                    onClick={() => openThread(disc.id)}
-                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-lime/50 bg-popover px-3 py-1.5 text-xs shadow-glow transition hover:scale-105"
-                    style={{ minWidth: bubbleSize, maxWidth: 240 }}
-                  >
-                    <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>{mediaLabel(disc)}</div>
-                    {count > 0 && (
-                      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
-                        {count} repl{count === 1 ? "y" : "ies"}
-                      </div>
-                    )}
-                  </button>
-                )}
-                <div className="bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background">
-                  <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color, avatar_url: me.avatar_url }} size={64} />
-                </div>
-                <div className="mt-1 flex items-center justify-center gap-1.5 text-center">
-                  <span className="h-1.5 w-1.5 rounded-full bg-lime" />
-                  <span className="max-w-[100px] truncate text-[11px] font-semibold text-foreground">{me.display_name}</span>
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-lime">you</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Open chat FAB */}
