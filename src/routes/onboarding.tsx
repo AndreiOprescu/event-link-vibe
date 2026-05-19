@@ -10,8 +10,7 @@ export const Route = createFileRoute("/onboarding")({
   component: Onboarding,
 });
 
-const EMOJIS = ["🚀", "🦊", "🐼", "🦉", "🐯", "🦄", "🐺", "🐧", "🦋", "🐙", "🐸", "🦁"];
-const TRACKS = ["AI × IRL", "Founders", "Design Eng", "Infra", "Research", "Community", "Investors"];
+const TRACKS = ["AI x Business", "AI x Finance", "AI x Live Events", "Startup"];
 
 function Onboarding() {
   const nav = useNavigate();
