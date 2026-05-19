@@ -299,7 +299,14 @@ function EventRoom() {
       )}
 
       {selectedUser && !chatOpen && (
-        <ProfileDrawer p={selectedUser} onClose={() => setSelected(null)} onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }} />
+        <ProfileDrawer
+          p={selectedUser}
+          member={members.get(selectedUser.id) ?? null}
+          isMe={!!me && selectedUser.id === me.id}
+          onClose={() => setSelected(null)}
+          onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onRecord={() => { setSelected(null); setRecorderOpen(true); }}
+        />
       )}
 
       {chatOpen && (
@@ -327,9 +334,9 @@ function EventRoom() {
         />
       )}
 
-      {/* Optional video intro prompt (first time only, after intake) */}
+      {/* First-time video intro popup (after intake) */}
       {showVideoPrompt && !recorderOpen && (
-        <VideoIntroPrompt
+        <VideoIntroModal
           onRecord={() => { setShowVideoPrompt(false); setRecorderOpen(true); }}
           onSkip={() => setShowVideoPrompt(false)}
         />
@@ -343,25 +350,6 @@ function EventRoom() {
           onSaved={() => { setRecorderOpen(false); loadMembers(user.id); }}
         />
       )}
-
-      {/* Intro video playback overlay */}
-      {playingVideoFor && (() => {
-        const m = members.get(playingVideoFor);
-        const p = profileById.get(playingVideoFor);
-        if (!m?.intro_video_url) return null;
-        return (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 p-4 backdrop-blur-md" onClick={() => setPlayingVideoFor(null)}>
-            <div className="w-full max-w-lg rounded-3xl border border-border bg-popover p-5 shadow-card" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="font-display text-base font-semibold">{p?.display_name ?? "Intro"}</div>
-                <button onClick={() => setPlayingVideoFor(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-              </div>
-              <video src={m.intro_video_url} autoPlay controls playsInline className="aspect-video w-full rounded-2xl bg-black" />
-              {m.intro && <p className="mt-3 text-xs text-muted-foreground">{m.intro}</p>}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
