@@ -8,7 +8,7 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
 import { EventIntakeModal } from "@/components/app/EventIntakeModal";
-import { VideoIntroPrompt, VideoIntroRecorder } from "@/components/app/VideoIntro";
+import { VideoIntroModal, VideoIntroRecorder } from "@/components/app/VideoIntro";
 import { getInitials } from "@/lib/initials";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/")({
@@ -41,7 +41,7 @@ function EventRoom() {
   const [memberLoaded, setMemberLoaded] = useState(false);
   const [showVideoPrompt, setShowVideoPrompt] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
-  const [playingVideoFor, setPlayingVideoFor] = useState<string | null>(null);
+  
 
   const myMember = user ? members.get(user.id) ?? null : null;
   const needsIntake = memberLoaded && !!user && !myMember;
@@ -270,11 +270,7 @@ function EventRoom() {
                     user={{ id: a.id, name: a.display_name, color: a.color, avatar_url: a.avatar_url }}
                     size={isMe ? 64 : 56}
                     label={!isMe}
-                    onClick={isMe ? undefined : () => {
-                      const m = members.get(a.id);
-                      if (m?.intro_video_url) setPlayingVideoFor(a.id);
-                      else setSelected(a.id);
-                    }}
+                    onClick={() => setSelected(a.id)}
                   />
                 </div>
                 {isMe && me && (
@@ -303,7 +299,14 @@ function EventRoom() {
       )}
 
       {selectedUser && !chatOpen && (
-        <ProfileDrawer p={selectedUser} onClose={() => setSelected(null)} onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }} />
+        <ProfileDrawer
+          p={selectedUser}
+          member={members.get(selectedUser.id) ?? null}
+          isMe={!!me && selectedUser.id === me.id}
+          onClose={() => setSelected(null)}
+          onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onRecord={() => { setSelected(null); setRecorderOpen(true); }}
+        />
       )}
 
       {chatOpen && (
@@ -331,9 +334,9 @@ function EventRoom() {
         />
       )}
 
-      {/* Optional video intro prompt (first time only, after intake) */}
+      {/* First-time video intro popup (after intake) */}
       {showVideoPrompt && !recorderOpen && (
-        <VideoIntroPrompt
+        <VideoIntroModal
           onRecord={() => { setShowVideoPrompt(false); setRecorderOpen(true); }}
           onSkip={() => setShowVideoPrompt(false)}
         />
@@ -347,25 +350,6 @@ function EventRoom() {
           onSaved={() => { setRecorderOpen(false); loadMembers(user.id); }}
         />
       )}
-
-      {/* Intro video playback overlay */}
-      {playingVideoFor && (() => {
-        const m = members.get(playingVideoFor);
-        const p = profileById.get(playingVideoFor);
-        if (!m?.intro_video_url) return null;
-        return (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 p-4 backdrop-blur-md" onClick={() => setPlayingVideoFor(null)}>
-            <div className="w-full max-w-lg rounded-3xl border border-border bg-popover p-5 shadow-card" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="font-display text-base font-semibold">{p?.display_name ?? "Intro"}</div>
-                <button onClick={() => setPlayingVideoFor(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-              </div>
-              <video src={m.intro_video_url} autoPlay controls playsInline className="aspect-video w-full rounded-2xl bg-black" />
-              {m.intro && <p className="mt-3 text-xs text-muted-foreground">{m.intro}</p>}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
@@ -385,35 +369,115 @@ function HoverCard({ p }: { p: Profile }) {
   );
 }
 
-function ProfileDrawer({ p, onClose, onChat }: { p: Profile; onClose: () => void; onChat: () => void }) {
+type DrawerMember = { intro_video_url: string | null; intro: string | null } | null;
+
+function ProfileDrawer({
+  p,
+  member,
+  isMe,
+  onClose,
+  onChat,
+  onRecord,
+}: {
+  p: Profile;
+  member: DrawerMember;
+  isMe: boolean;
+  onClose: () => void;
+  onChat: () => void;
+  onRecord: () => void;
+}) {
+  const videoUrl = member?.intro_video_url ?? null;
   return (
-    <div className="absolute inset-0 z-50 flex items-end justify-center bg-background/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div className="m-4 w-full max-w-sm rounded-3xl border border-border bg-popover p-6 shadow-card" onClick={(e) => e.stopPropagation()}>
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div className="m-4 w-full max-w-xl rounded-3xl border border-border bg-popover p-6 shadow-card sm:p-8" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-end">
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full font-semibold" style={{ backgroundColor: p.color, color: "#0a0a0a", fontSize: 22 }}>
-            {getInitials(p.display_name)}
-          </div>
-          <div>
-            <div className="font-display text-xl font-semibold">{p.display_name}</div>
-            <div className="text-xs text-muted-foreground">{p.role} · {p.company}</div>
-          </div>
+
+        <div className="flex flex-col items-center text-center">
+          {p.avatar_url ? (
+            <img
+              src={p.avatar_url}
+              alt={p.display_name}
+              className="h-20 w-20 rounded-full object-cover ring-2 ring-border"
+            />
+          ) : (
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-full font-semibold"
+              style={{ backgroundColor: p.color, color: "#0a0a0a", fontSize: 26 }}
+            >
+              {getInitials(p.display_name)}
+            </div>
+          )}
+          <div className="mt-3 font-display text-2xl font-semibold">{p.display_name}</div>
+          {(p.role || p.company) && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {[p.role, p.company].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
+
+        {videoUrl ? (
+          <div className="mt-6">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-lime">
+              {isMe ? "Your intro" : "Video intro"}
+            </div>
+            <video
+              key={videoUrl}
+              src={videoUrl}
+              autoPlay
+              controls
+              playsInline
+              className="mt-2 aspect-video w-full rounded-2xl bg-black"
+            />
+            {isMe && (
+              <button
+                onClick={onRecord}
+                className="mt-3 w-full rounded-full border border-border bg-background px-4 py-2 text-xs text-foreground hover:bg-surface"
+              >
+                Record a new intro
+              </button>
+            )}
+          </div>
+        ) : isMe ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-border bg-background/40 p-5 text-center">
+            <div className="font-display text-sm font-semibold">No intro video yet</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Record a short clip so people in the room know who you are.
+            </p>
+            <button
+              onClick={onRecord}
+              className="mt-3 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow"
+            >
+              <Play className="h-3.5 w-3.5" /> Record intro
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-border bg-background/40 p-3 text-center text-[11px] text-muted-foreground">
+            No intro video yet.
+          </div>
+        )}
+
         {p.goal && (
           <div className="mt-5 rounded-xl border border-lime/30 bg-lime/5 p-3">
             <div className="font-mono text-[10px] uppercase tracking-widest text-lime">Their goal</div>
             <div className="mt-1 text-sm">{p.goal}</div>
           </div>
         )}
+        {member?.intro && !isMe && (
+          <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-sm text-muted-foreground">
+            {member.intro}
+          </div>
+        )}
         <div className="mt-4 space-y-2 text-sm">
           {p.linkedin && <div className="flex items-center gap-2 text-muted-foreground"><Linkedin className="h-3.5 w-3.5" /> {p.linkedin}</div>}
           {p.email && <div className="flex items-center gap-2 text-muted-foreground"><Mail className="h-3.5 w-3.5" /> {p.email}</div>}
         </div>
-        <button onClick={onChat} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow">
-          <MessageCircle className="h-4 w-4" /> Open room chat
-        </button>
+        {!isMe && (
+          <button onClick={onChat} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow">
+            <MessageCircle className="h-4 w-4" /> Open room chat
+          </button>
+        )}
       </div>
     </div>
   );

@@ -222,3 +222,60 @@ export function VideoIntroPrompt({ onRecord, onSkip }: { onRecord: () => void; o
     </div>
   );
 }
+
+export function VideoIntroModal({ onRecord, onSkip }: { onRecord: () => void; onSkip: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 p-4 backdrop-blur-md"
+      onClick={onSkip}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl border border-border bg-popover p-8 shadow-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-lime">
+          <Video className="h-3 w-3" /> One more thing
+        </div>
+        <h2 className="mt-2 font-display text-2xl font-semibold leading-tight">
+          Add a video intro
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Up to 2 minutes. It plays when someone taps your bubble in the room — so they instantly
+          know who you are. Pick a prompt or do your own thing:
+        </p>
+
+        <div className="mt-5 space-y-2">
+          <div className="rounded-2xl border border-border bg-background/60 p-4">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Option 1</div>
+            <div className="mt-1 font-display text-sm font-semibold">Introduce yourself</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Who you are, what you're working on, what you're looking for.
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/60 p-4">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Option 2</div>
+            <div className="mt-1 font-display text-sm font-semibold">What do you think of the event so far?</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              A quick hot-take, favourite moment, or who you've enjoyed meeting.
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-2">
+          <button
+            onClick={onRecord}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.01]"
+          >
+            <Camera className="h-4 w-4" /> Record video
+          </button>
+          <button
+            onClick={onSkip}
+            className="w-full rounded-full py-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Skip for now — you can add one later from your own bubble.
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
