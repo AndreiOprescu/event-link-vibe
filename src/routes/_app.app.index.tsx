@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, Hash, Plus, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_app/app/")({
   head: () => ({ meta: [{ title: "Your events — EventLabs" }] }),
@@ -21,9 +22,11 @@ type Event = {
 };
 
 function MainScreen() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("live");
   const [code, setCode] = useState("");
   const [events, setEvents] = useState<Event[]>([]);
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.from("events").select("*").order("created_at", { ascending: true }).then(({ data }) => {
@@ -31,6 +34,18 @@ function MainScreen() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("event_members")
+      .select("event_id")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        setJoinedIds(new Set((data ?? []).map((r: { event_id: string }) => r.event_id)));
+      });
+  }, [user?.id]);
+
+  const hasJoined = joinedIds.size > 0;
   const filtered = events.filter((e) => e.status === tab);
 
   return (
@@ -39,29 +54,33 @@ function MainScreen() {
         <div>
           <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">— Your rooms</div>
           <h1 className="mt-2 font-display text-4xl font-semibold sm:text-5xl">
-            Drop into an event<span className="text-lime">.</span>
+            {hasJoined ? "Welcome back" : "Find your people"}<span className="text-lime">.</span>
           </h1>
           <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            Events stay open from the moment they're created until 48 hours after they end.
+            {hasJoined
+              ? "Your rooms are waiting — pick one to jump back in."
+              : "Got an event code? Drop it in to join your first room."}
           </p>
         </div>
 
-        <div className="flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border bg-surface p-2">
-          <Hash className="ml-2 h-4 w-4 text-muted-foreground" />
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="ENTER EVENT CODE"
-            className="flex-1 bg-transparent font-mono text-sm tracking-widest outline-none placeholder:text-muted-foreground"
-          />
-          <Link
-            to="/app/event/$eventId"
-            params={{ eventId: events.find((e) => e.code === code)?.id ?? "e1" }}
-            className="flex items-center gap-1 rounded-xl bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground"
-          >
-            Join <ArrowRight className="h-3 w-3" />
-          </Link>
-        </div>
+        {!hasJoined && (
+          <div className="flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border bg-surface p-2">
+            <Hash className="ml-2 h-4 w-4 text-muted-foreground" />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="ENTER EVENT CODE"
+              className="flex-1 bg-transparent font-mono text-sm tracking-widest outline-none placeholder:text-muted-foreground"
+            />
+            <Link
+              to="/app/event/$eventId"
+              params={{ eventId: events.find((e) => e.code === code)?.id ?? "e1" }}
+              className="flex items-center gap-1 rounded-xl bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Join <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="mt-12 flex items-center gap-1 rounded-full border border-border bg-surface p-1 sm:w-fit">

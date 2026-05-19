@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AvatarBubble } from "@/components/app/AvatarBubble";
-import { ArrowLeft, Mail, Linkedin, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Mail, Linkedin, MessageCircle, Play, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/hooks/useAuth";
 // TODO: re-enable break rooms
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
+import { EventIntakeModal } from "@/components/app/EventIntakeModal";
+import { VideoIntroPrompt, VideoIntroRecorder } from "@/components/app/VideoIntro";
+import { getInitials } from "@/lib/initials";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/")({
   head: () => ({ meta: [{ title: "Event room — EventLabs" }] }),
@@ -21,7 +24,7 @@ type EventRow = {
 
 function EventRoom() {
   const { eventId } = Route.useParams();
-  const { profile: me } = useAuth();
+  const { profile: me, user } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
   const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
@@ -31,6 +34,17 @@ function EventRoom() {
   const [selected, setSelected] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [focusDiscussionId, setFocusDiscussionId] = useState<string | null>(null);
+
+  // Per-event membership: drives the intake modal + video prompt
+  type Member = { user_id: string; event_id: string; goal: string; intro: string; intro_video_url: string | null; intro_duration_seconds: number | null };
+  const [members, setMembers] = useState<Map<string, Member>>(new Map());
+  const [memberLoaded, setMemberLoaded] = useState(false);
+  const [showVideoPrompt, setShowVideoPrompt] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [playingVideoFor, setPlayingVideoFor] = useState<string | null>(null);
+
+  const myMember = user ? members.get(user.id) ?? null : null;
+  const needsIntake = memberLoaded && !!user && !myMember;
 
   useEffect(() => {
     supabase.from("events").select("*").eq("id", eventId).maybeSingle().then(({ data }) => setEvent(data as EventRow | null));
@@ -45,6 +59,25 @@ function EventRoom() {
         setMessages((data ?? []) as unknown as Msg[]);
       });
   }, [eventId]);
+
+  // Load event_members (used both to know if I need intake, and to show others' intro videos)
+  const loadMembers = (uid?: string) => {
+    supabase
+      .from("event_members")
+      .select("user_id,event_id,goal,intro,intro_video_url,intro_duration_seconds")
+      .eq("event_id", eventId)
+      .then(({ data }) => {
+        const m = new Map<string, Member>();
+        (data ?? []).forEach((row: any) => m.set(row.user_id, row as Member));
+        setMembers(m);
+        if (uid !== undefined) setMemberLoaded(true);
+      });
+  };
+  useEffect(() => {
+    if (!user) return;
+    loadMembers(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, user?.id]);
 
   // Realtime: new chat messages
   useEffect(() => {
@@ -234,10 +267,14 @@ function EventRoom() {
                 )}
                 <div className={isMe ? "bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background" : "bubble-halo"}>
                   <AvatarBubble
-                    user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }}
+                    user={{ id: a.id, name: a.display_name, color: a.color, avatar_url: a.avatar_url }}
                     size={isMe ? 64 : 56}
                     label={!isMe}
-                    onClick={isMe ? undefined : () => setSelected(a.id)}
+                    onClick={isMe ? undefined : () => {
+                      const m = members.get(a.id);
+                      if (m?.intro_video_url) setPlayingVideoFor(a.id);
+                      else setSelected(a.id);
+                    }}
                   />
                 </div>
                 {isMe && me && (
@@ -280,6 +317,55 @@ function EventRoom() {
           onClose={() => { setChatOpen(false); setSelected(null); setFocusDiscussionId(null); }}
         />
       )}
+
+      {/* First-time intake modal — required to enter */}
+      {needsIntake && user && event && (
+        <EventIntakeModal
+          eventId={eventId}
+          eventTitle={event.title}
+          userId={user.id}
+          onComplete={() => {
+            loadMembers(user.id);
+            setShowVideoPrompt(true);
+          }}
+        />
+      )}
+
+      {/* Optional video intro prompt (first time only, after intake) */}
+      {showVideoPrompt && !recorderOpen && (
+        <VideoIntroPrompt
+          onRecord={() => { setShowVideoPrompt(false); setRecorderOpen(true); }}
+          onSkip={() => setShowVideoPrompt(false)}
+        />
+      )}
+
+      {recorderOpen && user && (
+        <VideoIntroRecorder
+          eventId={eventId}
+          userId={user.id}
+          onClose={() => setRecorderOpen(false)}
+          onSaved={() => { setRecorderOpen(false); loadMembers(user.id); }}
+        />
+      )}
+
+      {/* Intro video playback overlay */}
+      {playingVideoFor && (() => {
+        const m = members.get(playingVideoFor);
+        const p = profileById.get(playingVideoFor);
+        if (!m?.intro_video_url) return null;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 p-4 backdrop-blur-md" onClick={() => setPlayingVideoFor(null)}>
+            <div className="w-full max-w-lg rounded-3xl border border-border bg-popover p-5 shadow-card" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="font-display text-base font-semibold">{p?.display_name ?? "Intro"}</div>
+                <button onClick={() => setPlayingVideoFor(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              </div>
+              <video src={m.intro_video_url} autoPlay controls playsInline className="aspect-video w-full rounded-2xl bg-black" />
+              {m.intro && <p className="mt-3 text-xs text-muted-foreground">{m.intro}</p>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -307,8 +393,8 @@ function ProfileDrawer({ p, onClose, onChat }: { p: Profile; onClose: () => void
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full text-3xl" style={{ backgroundColor: p.color }}>
-            {p.emoji}
+          <div className="flex h-16 w-16 items-center justify-center rounded-full font-semibold" style={{ backgroundColor: p.color, color: "#0a0a0a", fontSize: 22 }}>
+            {getInitials(p.display_name)}
           </div>
           <div>
             <div className="font-display text-xl font-semibold">{p.display_name}</div>

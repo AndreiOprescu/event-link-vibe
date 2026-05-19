@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, ImageIcon, Linkedin, Loader2, LogOut, Mail, RefreshCw, Sparkles, X } from "lucide-react";
+import { Camera, Check, ImageIcon, Linkedin, Loader2, LogOut, Mail, RefreshCw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getInitials } from "@/lib/initials";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/app/profile")({
@@ -10,20 +11,17 @@ export const Route = createFileRoute("/_app/app/profile")({
   component: Profile,
 });
 
-const EMOJIS = ["🚀", "🦊", "🐼", "🦉", "🐯", "🦄", "🐺", "🐧", "🦋", "🐙", "🐸", "🦁"];
-
 function Profile() {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [emoji, setEmoji] = useState("🚀");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
   const [linkedin, setLinkedin] = useState("");
   const [track, setTrack] = useState("");
-  const [goal, setGoal] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [color, setColor] = useState("#A3E635");
   const [uploading, setUploading] = useState(false);
@@ -31,13 +29,12 @@ function Profile() {
 
   useEffect(() => {
     if (!profile) return;
-    setEmoji(profile.emoji);
     setDisplayName(profile.display_name);
     setEmail(profile.email ?? "");
     setCompany(profile.company ?? "");
+    setRole(profile.role ?? "");
     setLinkedin(profile.linkedin ?? "");
     setTrack(profile.track ?? "");
-    setGoal(profile.goal ?? "");
     setAvatarUrl(profile.avatar_url ?? null);
     setColor(profile.color);
   }, [profile]);
@@ -89,10 +86,9 @@ function Profile() {
           display_name: displayName,
           email,
           company,
+          role,
           linkedin,
           track,
-          goal,
-          emoji,
         })
         .eq("id", profile.id);
       if (error) throw error;
@@ -126,15 +122,17 @@ function Profile() {
         {/* Avatar card */}
         <div className="rounded-3xl border border-border bg-surface p-6 text-center">
           <div
-            className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full text-6xl shadow-card"
+            className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full font-semibold shadow-card"
             style={{
               backgroundColor: color,
               backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
               backgroundSize: "cover",
               backgroundPosition: "center",
+              fontSize: 36,
+              color: "#0a0a0a",
             }}
           >
-            {!avatarUrl && emoji}
+            {!avatarUrl && getInitials(displayName)}
           </div>
           <div className="mt-4 font-display text-lg font-semibold">{displayName || "You"}</div>
           <div className="text-xs text-muted-foreground">{company || "—"}</div>
@@ -179,42 +177,14 @@ function Profile() {
 
         {/* Forms */}
         <div className="space-y-6">
-          <Card title="Choose your emoji (used if no photo)">
-            <div className="grid grid-cols-6 gap-2">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  className={`flex aspect-square items-center justify-center rounded-xl border text-2xl transition ${
-                    emoji === e ? "border-lime bg-lime/10" : "border-border bg-background hover:bg-surface-2"
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          <Card title="Account">
+          <Card title="Tell us about yourself">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Field label="Full name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
               <Field label="Email" value={email} onChange={(e) => setEmail(e.target.value)} icon={Mail} />
               <Field label="Company / University" value={company} onChange={(e) => setCompany(e.target.value)} />
+              <Field label="Role" value={role} onChange={(e) => setRole(e.target.value)} />
               <Field label="LinkedIn" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} icon={Linkedin} />
               <Field label="Track" value={track} onChange={(e) => setTrack(e.target.value)} />
-            </div>
-          </Card>
-
-          <Card title="Your goal at events">
-            <textarea
-              rows={3}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-3 text-sm outline-none focus:border-lime"
-            />
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5 text-lime" />
-              We use this to match you in break rooms.
             </div>
           </Card>
 
