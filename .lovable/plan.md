@@ -1,33 +1,26 @@
-## Problem
+## Changes to `src/routes/index.tsx`
 
-Navigating to `/app/event/:eventId/break/:roomId` shows a black screen. The break-room screen itself (`_app.app.event.$eventId.break.$roomId.tsx`) is fine — round table, 4 seats, occupants — but it never renders.
+1. **Headline** → "The room keeps buzzing after the event ends." (single `<h1>`, lime period accent at end).
+2. **Sub-copy** → "Bubbles is a living digital space for events. Every attendee shows up as a glowing bubble. Tap one, hear what they have to say and slide into their LinkedIn, if you want." (highlight "glowing bubble" in lime to tie to the background animation).
+3. **Three cards** — drop the "Lane 01/02/03" tag entirely and replace title + body:
+   - Card 1 — "Show up as you" / "Create your bubble with a selfie, name and a headline for your goals to show up to the relevant attendee first."
+   - Card 2 — "Record a 60s intro" / "Share whatever is on your mind. Keep it easy, make a first impression."
+   - Card 3 — "Your bubble is floating" / "Look around the plaza and discover exciting attendees by clicking their bubble." (keep the lime-filled accent variant on this one)
+   - Card layout stays the same (icon + title + body); just remove the `tag` line.
+4. **Background bubbles** — add a fixed, `pointer-events-none`, `inset-0` layer behind everything containing ~12 absolutely-positioned circles:
+   - Sizes 40–140px, soft radial gradient (lime tint → translucent), thin lime ring, subtle blur, opacity 15–30%.
+   - Each rises from `translateY(110vh)` to `translateY(-20vh)` with a small horizontal sway and gentle scale pulse via a new `@keyframes bubble-rise` in `src/styles.css`.
+   - Durations 22–48s, staggered `animation-delay`, `ease-in-out`, `infinite`.
+   - Respects `prefers-reduced-motion` (pause).
+5. **Hero positioning** — wrap the main hero content in `relative z-10` so it sits above the bubble layer; the surface card grid keeps its solid background so bubbles read as ambient backdrop only.
 
-The cause is the parent route file `src/routes/_app.app.event.$eventId.break.tsx`. It is a parent of the `$roomId` child route, but its component (`BreakRedirect`) does two wrong things at once:
+## Changes to `src/styles.css`
 
-1. It renders `<Navigate to=".../break/$roomId" .../>` unconditionally, so even when the URL already targets a specific room, it tries to redirect again (often back to itself or another room, depending on counts) — causing a redirect loop / blank screen.
-2. It never renders `<Outlet />`, so even if the child route matches, the break-room UI has nowhere to mount.
-
-## Fix
-
-Split the `/break` segment into a layout + an index route, mirroring the pattern we already used for `$eventId`:
-
-1. **Create** `src/routes/_app.app.event.$eventId.break.index.tsx`
-   - Path: `/_app/app/event/$eventId/break/`
-   - Contains the existing `BreakRedirect` logic (smart-pick best room, `<Navigate replace />` to `.../break/$roomId`).
-   - Only runs when the URL is exactly `/app/event/:eventId/break` (no roomId).
-
-2. **Replace** `src/routes/_app.app.event.$eventId.break.tsx` with a minimal pathless layout:
-   ```tsx
-   import { createFileRoute, Outlet } from "@tanstack/react-router";
-   export const Route = createFileRoute("/_app/app/event/$eventId/break")({
-     component: () => <Outlet />,
-   });
-   ```
-
-With this, `/app/event/:id/break/room-04` matches the layout (renders `<Outlet />`) and the `$roomId` child mounts the round-table screen. `/app/event/:id/break` (no room) still smart-redirects via the new index route. `BreakRoomPicker` and the room screen itself need no changes.
-
-`src/routeTree.gen.ts` regenerates automatically.
+- Add `@keyframes bubble-rise` (translateY + translateX sway + scale pulse).
+- Add a `.bubble` utility class encapsulating the gradient/ring/blur baseline so the JSX stays compact.
+- Add a `@media (prefers-reduced-motion: reduce)` rule that pauses `.bubble`.
 
 ## Out of scope
 
-No changes to `BreakRoom` UI, seats, chat, presence, or `BreakRoomPicker`.
+- Nav header, "Sign in" / "Join an event" / "Create account" CTAs, footer text, `head()` meta (still says "EventLabs"). If you want the meta / nav also rebranded to "Bubbles", that's a separate request.
+- No new dependencies, no route changes, no backend changes.
