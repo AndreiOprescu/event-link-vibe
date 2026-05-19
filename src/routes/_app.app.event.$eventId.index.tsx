@@ -273,7 +273,9 @@ function EventRoom() {
 
   const openThread = (discussionId: string) => {
     setFocusDiscussionId(discussionId);
+    setActiveChat({ kind: "room" });
     setChatOpen(true);
+    if (me) markRead({ kind: "room" });
   };
 
   const selectedUser = selected ? profileById.get(selected) ?? null : null;
