@@ -8,7 +8,7 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
 import { EventIntakeModal } from "@/components/app/EventIntakeModal";
-import { VideoIntroPrompt, VideoIntroRecorder } from "@/components/app/VideoIntro";
+import { VideoIntroModal, VideoIntroRecorder } from "@/components/app/VideoIntro";
 import { getInitials } from "@/lib/initials";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/")({
