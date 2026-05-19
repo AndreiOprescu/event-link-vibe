@@ -127,33 +127,40 @@ function EventRoom() {
           const disc = activeDiscussionByProfile.get(a.id);
           const count = disc ? replyCount.get(disc.id) ?? 0 : 0;
           const bubbleSize = Math.min(140, 48 + count * 8);
+          const seed = a.id.charCodeAt(0) + a.id.charCodeAt(1 % a.id.length);
+          const delay = -((seed * 0.37) % 6);
+          const duration = 5 + ((seed * 0.19) % 4);
           return (
             <div
               key={a.id}
-              className="absolute drift"
-              style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -50%)", animationDelay: `${(a.id.charCodeAt(0) * 0.13) % 4}s` }}
+              className="absolute"
+              style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -50%)" }}
               onMouseEnter={() => setHover(a.id)}
               onMouseLeave={() => setHover(null)}
             >
-              {disc && (
-                <button
-                  onClick={() => openThread(disc.id)}
-                  className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-border bg-popover px-3 py-1.5 text-xs shadow-card transition hover:border-lime hover:scale-105"
-                  style={{ minWidth: bubbleSize, maxWidth: 240 }}
-                  title={`${count} repl${count === 1 ? "y" : "ies"}`}
-                >
-                  <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>
-                    {mediaLabel(disc)}
-                  </div>
-                  {count > 0 && (
-                    <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
-                      {count} repl{count === 1 ? "y" : "ies"}
+              <div className="drift" style={{ animationDelay: `${delay}s`, animationDuration: `${duration}s` }}>
+                {disc && (
+                  <button
+                    onClick={() => openThread(disc.id)}
+                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-border bg-popover px-3 py-1.5 text-xs shadow-card transition hover:border-lime hover:scale-105"
+                    style={{ minWidth: bubbleSize, maxWidth: 240 }}
+                    title={`${count} repl${count === 1 ? "y" : "ies"}`}
+                  >
+                    <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>
+                      {mediaLabel(disc)}
                     </div>
-                  )}
-                </button>
-              )}
-              <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color }} size={56} label onClick={() => setSelected(a.id)} />
-              {hover === a.id && <HoverCard p={a} />}
+                    {count > 0 && (
+                      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
+                        {count} repl{count === 1 ? "y" : "ies"}
+                      </div>
+                    )}
+                  </button>
+                )}
+                <div className="bubble-halo">
+                  <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color }} size={56} label onClick={() => setSelected(a.id)} />
+                </div>
+                {hover === a.id && <HoverCard p={a} />}
+              </div>
             </div>
           );
         })}
