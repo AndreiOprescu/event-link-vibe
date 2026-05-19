@@ -7,7 +7,7 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
 
-export const Route = createFileRoute("/_app/app/event/$eventId")({
+export const Route = createFileRoute("/_app/app/event/$eventId/")({
   head: () => ({ meta: [{ title: "Event room — EventLabs" }] }),
   component: EventRoom,
 });
