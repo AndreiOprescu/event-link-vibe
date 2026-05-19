@@ -24,7 +24,7 @@ type EventRow = {
 
 function EventRoom() {
   const { eventId } = Route.useParams();
-  const { profile: me } = useAuth();
+  const { profile: me, user } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
   const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
@@ -34,6 +34,17 @@ function EventRoom() {
   const [selected, setSelected] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [focusDiscussionId, setFocusDiscussionId] = useState<string | null>(null);
+
+  // Per-event membership: drives the intake modal + video prompt
+  type Member = { user_id: string; event_id: string; goal: string; intro: string; intro_video_url: string | null; intro_duration_seconds: number | null };
+  const [members, setMembers] = useState<Map<string, Member>>(new Map());
+  const [memberLoaded, setMemberLoaded] = useState(false);
+  const [showVideoPrompt, setShowVideoPrompt] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [playingVideoFor, setPlayingVideoFor] = useState<string | null>(null);
+
+  const myMember = user ? members.get(user.id) ?? null : null;
+  const needsIntake = memberLoaded && !!user && !myMember;
 
   useEffect(() => {
     supabase.from("events").select("*").eq("id", eventId).maybeSingle().then(({ data }) => setEvent(data as EventRow | null));
