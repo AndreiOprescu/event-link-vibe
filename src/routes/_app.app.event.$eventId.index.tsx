@@ -550,7 +550,7 @@ function HoverCard({ p }: { p: Profile }) {
   );
 }
 
-type DrawerMember = { intro_video_url: string | null; intro: string | null } | null;
+type DrawerMember = { intro_video_url: string | null; intro: string | null; goal: string | null } | null;
 
 function ProfileDrawer({
   p,
