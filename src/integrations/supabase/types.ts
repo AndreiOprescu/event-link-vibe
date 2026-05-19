@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      event_members: {
+        Row: {
+          event_id: string
+          goal: string
+          intro: string
+          intro_duration_seconds: number | null
+          intro_video_url: string | null
+          joined_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          goal: string
+          intro: string
+          intro_duration_seconds?: number | null
+          intro_video_url?: string | null
+          joined_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          goal?: string
+          intro?: string
+          intro_duration_seconds?: number | null
+          intro_video_url?: string | null
+          joined_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_messages: {
         Row: {
           created_at: string
