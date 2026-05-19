@@ -22,7 +22,7 @@ function Onboarding() {
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [linkedin, setLinkedin] = useState("");
-  const [track, setTrack] = useState("AI × IRL");
+  const [track, setTrack] = useState("AI x Business");
   const [emoji, setEmoji] = useState("🚀");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
