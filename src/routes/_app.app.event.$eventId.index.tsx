@@ -270,11 +270,7 @@ function EventRoom() {
                     user={{ id: a.id, name: a.display_name, color: a.color, avatar_url: a.avatar_url }}
                     size={isMe ? 64 : 56}
                     label={!isMe}
-                    onClick={isMe ? undefined : () => {
-                      const m = members.get(a.id);
-                      if (m?.intro_video_url) setPlayingVideoFor(a.id);
-                      else setSelected(a.id);
-                    }}
+                    onClick={() => setSelected(a.id)}
                   />
                 </div>
                 {isMe && me && (
