@@ -36,69 +36,84 @@
   --color-ring: var(--ring);
   --color-lime: var(--lime);
   --color-lime-glow: var(--lime-glow);
+  --color-coral: var(--coral);
+  --color-sky-soft: var(--sky-soft);
+  --color-terracotta: var(--terracotta);
+  --color-navy: var(--navy);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
 
   --shadow-glow: 0 0 40px -10px var(--lime-glow);
-  --shadow-card: 0 8px 32px -12px oklch(0 0 0 / 0.6);
+  --shadow-card: 0 8px 24px -14px oklch(0.32 0.08 50 / 0.25), 0 2px 6px -2px oklch(0.32 0.08 50 / 0.12);
 }
 
 :root {
   --radius: 1rem;
-  /* Deep near-black */
-  --background: oklch(0.13 0 0);
-  --foreground: oklch(0.98 0 0);
 
-  --surface: oklch(0.17 0 0);
-  --surface-2: oklch(0.21 0 0);
+  /* Warm paper background — cream/sand */
+  --background: oklch(0.965 0.022 80);
+  --foreground: oklch(0.26 0.05 255);
 
-  --card: oklch(0.17 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.19 0 0);
-  --popover-foreground: oklch(0.98 0 0);
+  --surface: oklch(0.94 0.028 75);
+  --surface-2: oklch(0.91 0.034 70);
 
-  /* Signature lime */
-  --lime: oklch(0.92 0.22 130);
-  --lime-glow: oklch(0.92 0.22 130 / 0.5);
+  --card: oklch(0.985 0.012 85);
+  --card-foreground: oklch(0.26 0.05 255);
+  --popover: oklch(0.985 0.012 85);
+  --popover-foreground: oklch(0.26 0.05 255);
 
-  --primary: oklch(0.92 0.22 130);
-  --primary-foreground: oklch(0.15 0 0);
+  /* Coral — primary warm accent (the salmon/red cards) */
+  --coral: oklch(0.72 0.18 32);
 
-  --secondary: oklch(0.22 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
+  /* Signature lime (kept — matches the lime card in the reference) */
+  --lime: oklch(0.86 0.19 125);
+  --lime-glow: oklch(0.86 0.19 125 / 0.55);
 
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.65 0 0);
+  /* Supporting brand swatches */
+  --sky-soft: oklch(0.82 0.08 235);
+  --terracotta: oklch(0.62 0.14 48);
+  --navy: oklch(0.32 0.09 255);
 
-  --accent: oklch(0.92 0.22 130);
-  --accent-foreground: oklch(0.15 0 0);
+  /* Primary action = coral, the warmest, most inviting hit */
+  --primary: oklch(0.72 0.18 32);
+  --primary-foreground: oklch(0.985 0.012 85);
 
-  --destructive: oklch(0.65 0.24 25);
-  --destructive-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.92 0.03 75);
+  --secondary-foreground: oklch(0.26 0.05 255);
 
-  --border: oklch(0.27 0 0);
-  --input: oklch(0.24 0 0);
-  --ring: oklch(0.92 0.22 130);
+  --muted: oklch(0.93 0.025 75);
+  --muted-foreground: oklch(0.48 0.04 250);
 
-  --sidebar: oklch(0.15 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.92 0.22 130);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.27 0 0);
-  --sidebar-ring: oklch(0.92 0.22 130);
+  --accent: oklch(0.86 0.19 125);
+  --accent-foreground: oklch(0.22 0.05 255);
 
-  --chart-1: oklch(0.92 0.22 130);
-  --chart-2: oklch(0.7 0.18 200);
-  --chart-3: oklch(0.75 0.2 50);
-  --chart-4: oklch(0.65 0.25 330);
-  --chart-5: oklch(0.7 0.2 280);
+  --destructive: oklch(0.6 0.22 27);
+  --destructive-foreground: oklch(0.985 0.012 85);
+
+  --border: oklch(0.86 0.035 70);
+  --input: oklch(0.92 0.028 75);
+  --ring: oklch(0.72 0.18 32);
+
+  --sidebar: oklch(0.94 0.028 75);
+  --sidebar-foreground: oklch(0.26 0.05 255);
+  --sidebar-primary: oklch(0.72 0.18 32);
+  --sidebar-primary-foreground: oklch(0.985 0.012 85);
+  --sidebar-accent: oklch(0.91 0.034 70);
+  --sidebar-accent-foreground: oklch(0.26 0.05 255);
+  --sidebar-border: oklch(0.86 0.035 70);
+  --sidebar-ring: oklch(0.72 0.18 32);
+
+  --chart-1: oklch(0.72 0.18 32);   /* coral */
+  --chart-2: oklch(0.82 0.08 235);  /* sky */
+  --chart-3: oklch(0.86 0.19 125);  /* lime */
+  --chart-4: oklch(0.62 0.14 48);   /* terracotta */
+  --chart-5: oklch(0.32 0.09 255);  /* navy */
 }
 
+/* Keep .dark class working but mirror the warm palette so nothing flips to black */
 .dark {
-  --background: oklch(0.13 0 0);
-  --foreground: oklch(0.98 0 0);
+  --background: oklch(0.965 0.022 80);
+  --foreground: oklch(0.26 0.05 255);
 }
 
 @layer base {
@@ -130,7 +145,7 @@
 
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 var(--lime-glow); }
-  50% { box-shadow: 0 0 30px 4px var(--lime-glow); }
+  50% { box-shadow: 0 0 22px 4px var(--lime-glow); }
 }
 .pulse-lime { animation: pulse-glow 2.4s ease-in-out infinite; }
 
@@ -142,7 +157,7 @@
 }
 .drift { animation: drift 6s ease-in-out infinite; will-change: transform; }
 
-/* Lime halo behind avatar bubbles in the event room */
+/* Soft warm halo behind avatar bubbles in the event room */
 .bubble-halo {
   position: relative;
 }
@@ -153,12 +168,12 @@
   border-radius: 9999px;
   background: radial-gradient(
     circle at 30% 30%,
-    oklch(0.92 0.22 130 / 0.45),
-    oklch(0.92 0.22 130 / 0.12) 55%,
+    oklch(0.72 0.18 32 / 0.32),
+    oklch(0.86 0.19 125 / 0.18) 55%,
     transparent 75%
   );
-  border: 1px solid oklch(0.92 0.22 130 / 0.3);
-  box-shadow: inset 0 0 14px oklch(0.92 0.22 130 / 0.25), 0 0 28px oklch(0.92 0.22 130 / 0.18);
+  border: 1px solid oklch(0.72 0.18 32 / 0.25);
+  box-shadow: inset 0 0 14px oklch(0.86 0.19 125 / 0.18), 0 0 28px oklch(0.72 0.18 32 / 0.18);
   filter: blur(0.4px);
   pointer-events: none;
   z-index: -1;
@@ -167,19 +182,19 @@
   .drift { animation: none; }
 }
 
-/* Tile floor for event room */
+/* Warm paper-tile floor for the event room */
 .tile-floor {
-  background-color: oklch(0.16 0 0);
+  background-color: oklch(0.94 0.03 75);
   background-image:
-    linear-gradient(45deg, oklch(0.19 0 0) 25%, transparent 25%),
-    linear-gradient(-45deg, oklch(0.19 0 0) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, oklch(0.19 0 0) 75%),
-    linear-gradient(-45deg, transparent 75%, oklch(0.19 0 0) 75%);
+    linear-gradient(45deg, oklch(0.91 0.038 65) 25%, transparent 25%),
+    linear-gradient(-45deg, oklch(0.91 0.038 65) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, oklch(0.91 0.038 65) 75%),
+    linear-gradient(-45deg, transparent 75%, oklch(0.91 0.038 65) 75%);
   background-size: 40px 40px;
   background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
 }
 
-/* Rising background bubbles */
+/* Rising background bubbles — warm coral/lime mix */
 @keyframes bubble-rise {
   0% {
     transform: translate3d(0, 110vh, 0) scale(0.9);
@@ -200,12 +215,12 @@
   border-radius: 9999px;
   background: radial-gradient(
     circle at 30% 30%,
-    oklch(0.92 0.22 130 / 0.55),
-    oklch(0.92 0.22 130 / 0.15) 55%,
+    oklch(0.72 0.18 32 / 0.45),
+    oklch(0.86 0.19 125 / 0.18) 55%,
     transparent 75%
   );
-  border: 1px solid oklch(0.92 0.22 130 / 0.35);
-  box-shadow: inset 0 0 12px oklch(0.92 0.22 130 / 0.25), 0 0 24px oklch(0.92 0.22 130 / 0.15);
+  border: 1px solid oklch(0.72 0.18 32 / 0.3);
+  box-shadow: inset 0 0 12px oklch(0.86 0.19 125 / 0.2), 0 0 24px oklch(0.72 0.18 32 / 0.15);
   filter: blur(0.4px);
   animation: bubble-rise linear infinite;
   will-change: transform, opacity;
