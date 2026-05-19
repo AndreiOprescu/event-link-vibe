@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_reads: {
+        Row: {
+          event_id: string
+          last_read_at: string
+          peer_profile_id: string
+          profile_id: string
+          scope: string
+        }
+        Insert: {
+          event_id: string
+          last_read_at?: string
+          peer_profile_id: string
+          profile_id: string
+          scope: string
+        }
+        Update: {
+          event_id?: string
+          last_read_at?: string
+          peer_profile_id?: string
+          profile_id?: string
+          scope?: string
+        }
+        Relationships: []
+      }
+      direct_messages: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          recipient_profile_id: string
+          sender_profile_id: string
+          text: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          recipient_profile_id: string
+          sender_profile_id: string
+          text?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          recipient_profile_id?: string
+          sender_profile_id?: string
+          text?: string | null
+        }
+        Relationships: []
+      }
       event_members: {
         Row: {
           event_id: string
