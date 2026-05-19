@@ -4,7 +4,8 @@ import { AvatarBubble } from "@/components/app/AvatarBubble";
 import { ArrowLeft, Mail, Linkedin, MessageCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/hooks/useAuth";
-import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
+// TODO: re-enable break rooms
+// import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/")({
@@ -188,7 +189,7 @@ function EventRoom() {
             </span>
           </div>
         )}
-        <BreakRoomPicker eventId={eventId} goal={me?.goal} />
+        <div />
       </div>
 
       {/* Room floor */}
