@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Camera, ImageIcon, Loader2, Smile } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CameraModal } from "@/components/app/CameraModal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/onboarding")({
@@ -27,6 +28,7 @@ function Onboarding() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const total = 2;
 
@@ -49,17 +51,15 @@ function Onboarding() {
     setAvatarUrl(profile.avatar_url ?? null);
   }, [profile]);
 
-  const uploadFile = useCallback(async (file: File) => {
+  const uploadBlob = useCallback(async (blob: Blob, ext: string, contentType: string) => {
     if (!user || !profile) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
+    if (blob.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const path = `avatars/${user.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("event-media")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, blob, { upsert: true, contentType });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("event-media").getPublicUrl(path);
       setAvatarUrl(pub.publicUrl);
@@ -73,7 +73,10 @@ function Onboarding() {
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) await uploadFile(file);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    await uploadBlob(file, ext, file.type);
   };
 
   const finish = async () => {
@@ -185,6 +188,14 @@ function Onboarding() {
                   {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
                   {uploading ? "Uploading…" : "Upload photo"}
                 </button>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => setCameraOpen(true)}
+                  className="flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow hover:scale-[1.01] disabled:opacity-60"
+                >
+                  <Camera className="h-3.5 w-3.5" /> Take a selfie
+                </button>
                 {avatarUrl && (
                   <button
                     type="button"
@@ -199,6 +210,18 @@ function Onboarding() {
           </Step>
         )}
       </div>
+
+      {cameraOpen && (
+        <CameraModal
+          onClose={() => setCameraOpen(false)}
+          onCapture={async (blob) => {
+            await uploadBlob(blob, "jpg", "image/jpeg");
+            setCameraOpen(false);
+          }}
+        />
+      )}
+
+
 
       <div className="mt-10 flex items-center justify-between">
         <button
