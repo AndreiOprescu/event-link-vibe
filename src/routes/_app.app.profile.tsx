@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { ME } from "@/data/mock";
-import { Camera, Check, Linkedin, LogOut, Mail, Sparkles } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Check, Linkedin, Loader2, LogOut, Mail, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/app/profile")({
   head: () => ({ meta: [{ title: "Profile — EventLabs" }] }),
@@ -11,7 +13,103 @@ export const Route = createFileRoute("/_app/app/profile")({
 const EMOJIS = ["🚀", "🦊", "🐼", "🦉", "🐯", "🦄", "🐺", "🐧", "🦋", "🐙", "🐸", "🦁"];
 
 function Profile() {
-  const [emoji, setEmoji] = useState(ME.emoji);
+  const { user, profile, loading } = useAuth();
+  const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [emoji, setEmoji] = useState("🚀");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [track, setTrack] = useState("");
+  const [goal, setGoal] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [color, setColor] = useState("#A3E635");
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    setEmoji(profile.emoji);
+    setDisplayName(profile.display_name);
+    setEmail(profile.email ?? "");
+    setCompany(profile.company ?? "");
+    setLinkedin(profile.linkedin ?? "");
+    setTrack(profile.track ?? "");
+    setGoal(profile.goal ?? "");
+    setAvatarUrl(profile.avatar_url ?? null);
+    setColor(profile.color);
+  }, [profile]);
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user || !profile) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `avatars/${user.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-media")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("event-media").getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: updErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: url })
+        .eq("id", profile.id);
+      if (updErr) throw updErr;
+      setAvatarUrl(url);
+      toast.success("Profile photo updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onSave = async () => {
+    if (!profile) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          display_name: displayName,
+          email,
+          company,
+          linkedin,
+          track,
+          goal,
+          emoji,
+        })
+        .eq("id", profile.id);
+      if (error) throw error;
+      toast.success("Saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/login" });
+  };
+
+  if (loading || !profile) {
+    return (
+      <div className="mx-auto max-w-4xl px-6 py-20 text-center text-sm text-muted-foreground">
+        Loading your profile…
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
@@ -21,19 +119,42 @@ function Profile() {
       <div className="mt-10 grid gap-6 md:grid-cols-[300px,1fr]">
         {/* Avatar card */}
         <div className="rounded-3xl border border-border bg-surface p-6 text-center">
-          <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full text-6xl shadow-card" style={{ backgroundColor: ME.color }}>
-            {emoji}
+          <div
+            className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full text-6xl shadow-card"
+            style={{
+              backgroundColor: color,
+              backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            {!avatarUrl && emoji}
           </div>
-          <div className="mt-4 font-display text-lg font-semibold">{ME.name}</div>
-          <div className="text-xs text-muted-foreground">{ME.role} · {ME.company}</div>
-          <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background py-2 text-xs hover:bg-surface-2">
-            <Camera className="h-3.5 w-3.5" /> Take a new selfie
+          <div className="mt-4 font-display text-lg font-semibold">{displayName || "You"}</div>
+          <div className="text-xs text-muted-foreground">{company || "—"}</div>
+
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={onPickFile}
+          />
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background py-2 text-xs hover:bg-surface-2 disabled:opacity-60"
+          >
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+            {uploading ? "Uploading…" : avatarUrl ? "Change photo" : "Take a selfie or upload"}
           </button>
         </div>
 
         {/* Forms */}
         <div className="space-y-6">
-          <Card title="Choose your avatar">
+          <Card title="Choose your emoji (used if no photo)">
             <div className="grid grid-cols-6 gap-2">
               {EMOJIS.map((e) => (
                 <button
@@ -51,19 +172,19 @@ function Profile() {
 
           <Card title="Account">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="First name" defaultValue="You" />
-              <Field label="Last name" defaultValue="" />
-              <Field label="Email" defaultValue={ME.email} icon={Mail} />
-              <Field label="Company / University" defaultValue={ME.company} />
-              <Field label="LinkedIn" defaultValue={ME.linkedin} icon={Linkedin} />
-              <Field label="Track" defaultValue={ME.track} />
+              <Field label="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <Field label="Email" value={email} onChange={(e) => setEmail(e.target.value)} icon={Mail} />
+              <Field label="Company / University" value={company} onChange={(e) => setCompany(e.target.value)} />
+              <Field label="LinkedIn" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} icon={Linkedin} />
+              <Field label="Track" value={track} onChange={(e) => setTrack(e.target.value)} />
             </div>
           </Card>
 
           <Card title="Your goal at events">
             <textarea
               rows={3}
-              defaultValue={ME.goal}
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
               className="w-full rounded-xl border border-input bg-background p-3 text-sm outline-none focus:border-lime"
             />
             <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
@@ -73,11 +194,16 @@ function Profile() {
           </Card>
 
           <div className="flex items-center justify-between gap-3">
-            <button className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-surface">
+            <button onClick={onSignOut} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-surface">
               <LogOut className="h-3.5 w-3.5" /> Sign out
             </button>
-            <button className="flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-xs font-semibold text-primary-foreground shadow-glow">
-              <Check className="h-3.5 w-3.5" /> Save changes
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-xs font-semibold text-primary-foreground shadow-glow disabled:opacity-60"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </div>
