@@ -217,6 +217,7 @@ export type Database = {
           id: string
           is_demo: boolean
           linkedin: string | null
+          profile_completed: boolean
           role: string | null
           track: string | null
           user_id: string | null
@@ -233,6 +234,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           linkedin?: string | null
+          profile_completed?: boolean
           role?: string | null
           track?: string | null
           user_id?: string | null
@@ -249,6 +251,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           linkedin?: string | null
+          profile_completed?: boolean
           role?: string | null
           track?: string | null
           user_id?: string | null

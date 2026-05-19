@@ -16,6 +16,7 @@ export type Profile = {
   track: string | null;
   is_demo: boolean;
   avatar_url?: string | null;
+  profile_completed?: boolean;
 };
 
 export function useAuth() {

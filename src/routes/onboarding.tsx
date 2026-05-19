@@ -1,6 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowRight, Camera, Smile } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, Camera, ImageIcon, Loader2, Smile } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Set up your profile — EventLabs" }] }),
@@ -11,16 +14,108 @@ const EMOJIS = ["🚀", "🦊", "🐼", "🦉", "🐯", "🦄", "🐺", "🐧", 
 const TRACKS = ["AI × IRL", "Founders", "Design Eng", "Infra", "Research", "Community", "Investors"];
 
 function Onboarding() {
-  const [step, setStep] = useState(1);
-  const [emoji, setEmoji] = useState("🚀");
-  const [track, setTrack] = useState("AI × IRL");
   const nav = useNavigate();
+  const { user, profile, loading } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const total = 4;
+  const [step, setStep] = useState(1);
+  const [displayName, setDisplayName] = useState("");
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [track, setTrack] = useState("AI × IRL");
+  const [emoji, setEmoji] = useState("🚀");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const total = 2;
+
+  // Gate: must be signed in; if already done, skip to /app
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { nav({ to: "/login" }); return; }
+    if (profile?.profile_completed) { nav({ to: "/app" }); }
+  }, [loading, user, profile, nav]);
+
+  // Prefill from existing profile
+  useEffect(() => {
+    if (!profile) return;
+    setDisplayName((prev) => prev || profile.display_name || "");
+    setCompany((prev) => prev || profile.company || "");
+    setRole((prev) => prev || profile.role || "");
+    setLinkedin((prev) => prev || profile.linkedin || "");
+    setTrack((prev) => profile.track || prev);
+    setEmoji((prev) => profile.emoji || prev);
+    setAvatarUrl(profile.avatar_url ?? null);
+  }, [profile]);
+
+  const uploadFile = useCallback(async (file: File) => {
+    if (!user || !profile) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `avatars/${user.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-media")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("event-media").getPublicUrl(path);
+      setAvatarUrl(pub.publicUrl);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, [user, profile]);
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) await uploadFile(file);
+  };
+
+  const finish = async () => {
+    if (!profile) return;
+    if (displayName.trim().length < 2) { toast.error("Please add your name"); setStep(1); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          display_name: displayName.trim(),
+          company: company.trim() || null,
+          role: role.trim() || null,
+          linkedin: linkedin.trim() || null,
+          track,
+          emoji,
+          avatar_url: avatarUrl,
+          profile_completed: true,
+        })
+        .eq("id", profile.id);
+      if (error) throw error;
+      nav({ to: "/app" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !user || !profile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        <span className="mr-2 h-2 w-2 rounded-full bg-lime pulse-lime" /> loading…
+      </div>
+    );
+  }
+
+  const canNext = step === 1 ? displayName.trim().length >= 2 : true;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-xl flex-col px-6 py-10">
-      {/* Progress */}
       <div className="mb-10 flex items-center gap-2">
         {Array.from({ length: total }).map((_, i) => (
           <div
@@ -35,80 +130,84 @@ function Onboarding() {
 
       <div className="flex-1">
         {step === 1 && (
-          <Step title="Tell us about you." sub="The basics — we'll only show what you want.">
+          <Step title="Tell us about you." sub="A few basics so people in the room can place you.">
+            <Input label="Full name" placeholder="Maya Okafor" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             <Grid2>
-              <Input label="First name" placeholder="Maya" />
-              <Input label="Last name" placeholder="Okafor" />
+              <Input label="Company / University" placeholder="Northwind" value={company} onChange={(e) => setCompany(e.target.value)} />
+              <Input label="Role" placeholder="Founding engineer" value={role} onChange={(e) => setRole(e.target.value)} />
             </Grid2>
-            <Input label="Email" placeholder="maya@event.com" />
-            <Input label="Password" type="password" placeholder="••••••••" />
-            <Grid2>
-              <Input label="Company / University" placeholder="Northwind" />
-              <Input label="LinkedIn" placeholder="maya-okafor" />
-            </Grid2>
-            <Input label="GitHub (optional)" placeholder="github.com/you" />
+            <Input label="LinkedIn (optional)" placeholder="maya-okafor" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
+            <div>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Track</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {TRACKS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTrack(t)}
+                    className={`rounded-full border px-4 py-2 text-sm transition ${
+                      track === t
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface hover:bg-surface-2"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
           </Step>
         )}
 
         {step === 2 && (
-          <Step title="Pick your face." sub="Memoji or a quick selfie — your call.">
-            <div className="grid grid-cols-6 gap-3">
+          <Step title="Pick your face." sub="An emoji, a photo, or a quick selfie — your call.">
+            <div className="flex flex-col items-center gap-4">
+              <div
+                className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full text-5xl shadow-card"
+                style={{
+                  backgroundColor: profile.color,
+                  backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              >
+                {!avatarUrl && emoji}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs hover:bg-surface-2 disabled:opacity-60"
+                >
+                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                  {uploading ? "Uploading…" : "Upload photo"}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl(null)}
+                    className="rounded-full border border-border bg-background px-4 py-2 text-xs hover:bg-surface-2"
+                  >
+                    Use emoji instead
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-6 gap-3">
               {EMOJIS.map((e) => (
                 <button
                   key={e}
-                  onClick={() => setEmoji(e)}
+                  type="button"
+                  onClick={() => { setEmoji(e); setAvatarUrl(null); }}
                   className={`flex aspect-square items-center justify-center rounded-2xl border text-3xl transition ${
-                    emoji === e ? "border-lime bg-lime/10 shadow-glow" : "border-border bg-surface hover:bg-surface-2"
+                    emoji === e && !avatarUrl ? "border-lime bg-lime/10 shadow-glow" : "border-border bg-surface hover:bg-surface-2"
                   }`}
                 >
                   {e}
                 </button>
               ))}
-            </div>
-            <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface py-4 text-sm text-muted-foreground hover:bg-surface-2">
-              <Camera className="h-4 w-4" /> Take a selfie instead
-            </button>
-          </Step>
-        )}
-
-        {step === 3 && (
-          <Step title="Pick a track." sub="What lane are you in for this event?">
-            <div className="flex flex-wrap gap-2">
-              {TRACKS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTrack(t)}
-                  className={`rounded-full border px-4 py-2 text-sm transition ${
-                    track === t
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface hover:bg-surface-2"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </Step>
-        )}
-
-        {step === 4 && (
-          <Step title="What's your goal?" sub="We use this to match you with the right people.">
-            <textarea
-              rows={5}
-              placeholder="e.g. Find a co-founder, hire two engineers, learn from designers…"
-              className="w-full rounded-2xl border border-input bg-background p-4 text-sm outline-none focus:border-lime"
-            />
-            <div className="mt-6 rounded-2xl border border-lime/30 bg-lime/5 p-5">
-              <div className="font-mono text-xs text-lime">YOUR CARD</div>
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-lime text-2xl">
-                  {emoji}
-                </div>
-                <div>
-                  <div className="font-display text-base font-semibold">You</div>
-                  <div className="text-xs text-muted-foreground">{track}</div>
-                </div>
-              </div>
             </div>
           </Step>
         )}
@@ -116,16 +215,20 @@ function Onboarding() {
 
       <div className="mt-10 flex items-center justify-between">
         <button
-          onClick={() => (step === 1 ? nav({ to: "/login" }) : setStep(step - 1))}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          onClick={() => (step === 1 ? null : setStep(step - 1))}
+          disabled={step === 1}
+          className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30"
         >
           ← Back
         </button>
         <button
-          onClick={() => (step === total ? nav({ to: "/app" }) : setStep(step + 1))}
-          className="flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow"
+          onClick={() => (step === total ? finish() : setStep(step + 1))}
+          disabled={!canNext || saving}
+          className="flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {step === total ? "Enter EventLabs" : "Next"} <ArrowRight className="h-4 w-4" />
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {step === total ? (saving ? "Saving…" : "Enter EventLabs") : "Next"}
+          {!saving && <ArrowRight className="h-4 w-4" />}
         </button>
       </div>
     </div>
@@ -137,7 +240,7 @@ function Step({ title, sub, children }: { title: string; sub: string; children: 
     <div className="space-y-4">
       <div>
         <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
-          <Smile className="h-3 w-3" /> Onboarding
+          <Smile className="h-3 w-3" /> Profile setup
         </div>
         <h1 className="mt-2 font-display text-3xl font-semibold">{title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
