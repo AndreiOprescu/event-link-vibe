@@ -74,7 +74,12 @@ function EventRoom() {
       .from("event_members")
       .select("user_id,event_id,goal,intro,intro_video_url,intro_duration_seconds")
       .eq("event_id", eventId)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          // Don't flip memberLoaded on error — that would falsely trigger the intake popup.
+          console.error("loadMembers failed", error);
+          return;
+        }
         const m = new Map<string, Member>();
         (data ?? []).forEach((row: any) => m.set(row.user_id, row as Member));
         setMembers(m);
