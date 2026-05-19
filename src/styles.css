@@ -135,10 +135,37 @@
 .pulse-lime { animation: pulse-glow 2.4s ease-in-out infinite; }
 
 @keyframes drift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(3px, -5px); }
+  50% { transform: translate(-2px, -8px); }
+  75% { transform: translate(-4px, -3px); }
 }
-.drift { animation: drift 4s ease-in-out infinite; }
+.drift { animation: drift 6s ease-in-out infinite; will-change: transform; }
+
+/* Lime halo behind avatar bubbles in the event room */
+.bubble-halo {
+  position: relative;
+}
+.bubble-halo::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 30% 30%,
+    oklch(0.92 0.22 130 / 0.45),
+    oklch(0.92 0.22 130 / 0.12) 55%,
+    transparent 75%
+  );
+  border: 1px solid oklch(0.92 0.22 130 / 0.3);
+  box-shadow: inset 0 0 14px oklch(0.92 0.22 130 / 0.25), 0 0 28px oklch(0.92 0.22 130 / 0.18);
+  filter: blur(0.4px);
+  pointer-events: none;
+  z-index: -1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drift { animation: none; }
+}
 
 /* Tile floor for event room */
 .tile-floor {
