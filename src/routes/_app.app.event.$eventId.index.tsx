@@ -157,7 +157,7 @@ function EventRoom() {
                   </button>
                 )}
                 <div className="bubble-halo">
-                  <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color }} size={56} label onClick={() => setSelected(a.id)} />
+                  <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }} size={56} label onClick={() => setSelected(a.id)} />
                 </div>
                 {hover === a.id && <HoverCard p={a} />}
               </div>
@@ -187,9 +187,13 @@ function EventRoom() {
                   </button>
                 )}
                 <div className="bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background">
-                  <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color }} size={64} label />
+                  <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color, avatar_url: me.avatar_url }} size={64} />
                 </div>
-                <div className="mt-1 text-center text-[10px] font-medium uppercase tracking-widest text-lime">you</div>
+                <div className="mt-1 flex items-center justify-center gap-1.5 text-center">
+                  <span className="h-1.5 w-1.5 rounded-full bg-lime" />
+                  <span className="max-w-[100px] truncate text-[11px] font-semibold text-foreground">{me.display_name}</span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-lime">you</span>
+                </div>
               </div>
             </div>
           );
