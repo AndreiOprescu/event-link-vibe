@@ -171,24 +171,26 @@ function EventRoom() {
           const bubbleSize = Math.min(140, 48 + count * 8);
           return (
             <div className="absolute" style={{ left: `${positions[me.id].x}%`, top: `${positions[me.id].y}%`, transform: "translate(-50%, -50%)" }}>
-              {disc && (
-                <button
-                  onClick={() => openThread(disc.id)}
-                  className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-lime/50 bg-popover px-3 py-1.5 text-xs shadow-glow transition hover:scale-105"
-                  style={{ minWidth: bubbleSize, maxWidth: 240 }}
-                >
-                  <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>{mediaLabel(disc)}</div>
-                  {count > 0 && (
-                    <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
-                      {count} repl{count === 1 ? "y" : "ies"}
-                    </div>
-                  )}
-                </button>
-              )}
-              <div className="rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background">
-                <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color }} size={64} label />
+              <div className="drift" style={{ animationDelay: "-1.5s", animationDuration: "7s" }}>
+                {disc && (
+                  <button
+                    onClick={() => openThread(disc.id)}
+                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-lime/50 bg-popover px-3 py-1.5 text-xs shadow-glow transition hover:scale-105"
+                    style={{ minWidth: bubbleSize, maxWidth: 240 }}
+                  >
+                    <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>{mediaLabel(disc)}</div>
+                    {count > 0 && (
+                      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
+                        {count} repl{count === 1 ? "y" : "ies"}
+                      </div>
+                    )}
+                  </button>
+                )}
+                <div className="bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background">
+                  <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color }} size={64} label />
+                </div>
+                <div className="mt-1 text-center text-[10px] font-medium uppercase tracking-widest text-lime">you</div>
               </div>
-              <div className="mt-1 text-center text-[10px] font-medium uppercase tracking-widest text-lime">you</div>
             </div>
           );
         })()}
