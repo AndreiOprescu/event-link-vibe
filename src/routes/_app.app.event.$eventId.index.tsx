@@ -45,13 +45,13 @@ function EventRoom() {
 
   // Per-event membership: drives the intake modal + video prompt
   type Member = { user_id: string; event_id: string; goal: string; intro: string; intro_video_url: string | null; intro_duration_seconds: number | null };
-  const [members, setMembers] = useState<Map<string, Member>>(new Map());
+  const [membersByUserId, setMembersByUserId] = useState<Map<string, Member>>(new Map());
   const [memberLoaded, setMemberLoaded] = useState(false);
   const [showVideoPrompt, setShowVideoPrompt] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
   
 
-  const myMember = user ? members.get(user.id) ?? null : null;
+  const myMember = user ? membersByUserId.get(user.id) ?? null : null;
   const needsIntake = memberLoaded && !!user && !myMember;
 
   useEffect(() => {
@@ -82,7 +82,7 @@ function EventRoom() {
         }
         const m = new Map<string, Member>();
         (data ?? []).forEach((row: any) => m.set(row.user_id, row as Member));
-        setMembers(m);
+        setMembersByUserId(m);
         if (uid !== undefined) setMemberLoaded(true);
       });
   };
@@ -284,6 +284,15 @@ function EventRoom() {
   };
 
   const selectedUser = selected ? profileById.get(selected) ?? null : null;
+  const memberByProfileId = useMemo(() => {
+    const m = new Map<string, Member>();
+    allPeople.forEach((p) => {
+      if (!p.user_id) return;
+      const member = membersByUserId.get(p.user_id);
+      if (member) m.set(p.id, member);
+    });
+    return m;
+  }, [allPeople, membersByUserId]);
 
   // Switcher items + unread counts
   const switcherItems = useMemo<ChatSwitcherItems>(() => {
@@ -438,7 +447,7 @@ function EventRoom() {
       {selectedUser && !chatOpen && (
         <ProfileDrawer
           p={selectedUser}
-          member={members.get(selectedUser.id) ?? null}
+          member={memberByProfileId.get(selectedUser.id) ?? null}
           isMe={!!me && selectedUser.id === me.id}
           onClose={() => setSelected(null)}
           onChat={() => openChat({ kind: "dm", peerId: selectedUser.id })}
