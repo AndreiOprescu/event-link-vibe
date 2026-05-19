@@ -17,22 +17,25 @@ export type Database = {
       chat_reads: {
         Row: {
           event_id: string
+          id: string
           last_read_at: string
-          peer_profile_id: string
+          peer_profile_id: string | null
           profile_id: string
           scope: string
         }
         Insert: {
           event_id: string
+          id?: string
           last_read_at?: string
-          peer_profile_id: string
+          peer_profile_id?: string | null
           profile_id: string
           scope: string
         }
         Update: {
           event_id?: string
+          id?: string
           last_read_at?: string
-          peer_profile_id?: string
+          peer_profile_id?: string | null
           profile_id?: string
           scope?: string
         }
