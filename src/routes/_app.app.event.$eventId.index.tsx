@@ -428,6 +428,7 @@ function ProfileDrawer({
               autoPlay
               controls
               playsInline
+              preload="metadata"
               className="mt-2 aspect-video w-full rounded-2xl bg-black"
             />
             {isMe && (
