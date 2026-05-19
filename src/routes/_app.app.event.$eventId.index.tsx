@@ -415,11 +415,16 @@ function EventRoom() {
       {/* Open chat FAB */}
       {!chatOpen && (
         <button
-          onClick={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onClick={() => openChat({ kind: "room" })}
           className="absolute bottom-6 right-6 z-30 flex items-center gap-2 rounded-full bg-lime px-5 py-3 text-sm font-semibold text-primary-foreground shadow-glow hover:scale-[1.03]"
         >
           <MessageCircle className="h-4 w-4" />
           Room chat
+          {totalUnread > 0 && (
+            <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-[10px] font-bold text-lime ring-2 ring-lime">
+              {totalUnread}
+            </span>
+          )}
         </button>
       )}
 
@@ -429,12 +434,12 @@ function EventRoom() {
           member={members.get(selectedUser.id) ?? null}
           isMe={!!me && selectedUser.id === me.id}
           onClose={() => setSelected(null)}
-          onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onChat={() => openChat({ kind: "dm", peerId: selectedUser.id })}
           onRecord={() => { setSelected(null); setRecorderOpen(true); }}
         />
       )}
 
-      {chatOpen && (
+      {chatOpen && activeChat.kind === "room" && (
         <RoomChat
           eventId={eventId}
           roomId={null}
@@ -443,8 +448,27 @@ function EventRoom() {
           me={me}
           focusDiscussionId={focusDiscussionId}
           onClose={() => { setChatOpen(false); setSelected(null); setFocusDiscussionId(null); }}
+          headerExtra={
+            <ChatSwitcher items={switcherWithActive} current={activeChat} onSelect={openChat} />
+          }
         />
       )}
+
+      {chatOpen && activeChat.kind === "dm" && me && (() => {
+        const peer = profileById.get(activeChat.peerId);
+        if (!peer) return null;
+        return (
+          <DirectChat
+            eventId={eventId}
+            me={me}
+            peer={peer}
+            switcherItems={switcherWithActive}
+            onSwitch={openChat}
+            onClose={() => { setChatOpen(false); setSelected(null); }}
+            onMarkRead={() => markRead({ kind: "dm", peerId: peer.id })}
+          />
+        );
+      })()}
 
       {/* First-time intake modal — required to enter */}
       {needsIntake && user && event && (
