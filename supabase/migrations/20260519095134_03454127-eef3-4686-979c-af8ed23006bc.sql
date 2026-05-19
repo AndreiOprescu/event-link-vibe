@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS event_media_insert_own ON storage.objects;

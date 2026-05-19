@@ -108,18 +108,48 @@ export function VideoIntroRecorder({ eventId, userId, onClose, onSaved }: Props)
       const { error: upErr } = await supabase.storage
         .from("event-media")
         .upload(path, previewBlob, { upsert: true, contentType: previewBlob.type || "video/webm" });
-      if (upErr) throw upErr;
+      if (upErr) {
+        console.error("[VideoIntro] storage upload failed", upErr);
+        throw upErr;
+      }
       const { data: pub } = supabase.storage.from("event-media").getPublicUrl(path);
       const url = pub.publicUrl;
-      const { error: updErr } = await supabase
+
+      // Try update first; if no row exists for this (user, event), fall back to upsert.
+      const { data: updated, error: updErr } = await supabase
         .from("event_members")
         .update({ intro_video_url: url, intro_duration_seconds: elapsed })
         .eq("user_id", userId)
-        .eq("event_id", eventId);
-      if (updErr) throw updErr;
+        .eq("event_id", eventId)
+        .select("user_id");
+      if (updErr) {
+        console.error("[VideoIntro] event_members update failed", updErr);
+        throw updErr;
+      }
+      if (!updated || updated.length === 0) {
+        const { error: upsertErr } = await supabase
+          .from("event_members")
+          .upsert(
+            {
+              user_id: userId,
+              event_id: eventId,
+              goal: "",
+              intro: "",
+              intro_video_url: url,
+              intro_duration_seconds: elapsed,
+            },
+            { onConflict: "user_id,event_id" },
+          );
+        if (upsertErr) {
+          console.error("[VideoIntro] event_members upsert failed", upsertErr);
+          throw upsertErr;
+        }
+      }
+
       toast.success("Intro video saved");
       onSaved(url, elapsed);
     } catch (e) {
+      console.error("[VideoIntro] save error", e);
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
@@ -158,7 +188,7 @@ export function VideoIntroRecorder({ eventId, userId, onClose, onSaved }: Props)
               <button onClick={startStream} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-surface">Retry</button>
             </div>
           ) : preview ? (
-            <video src={preview} controls playsInline className="h-full w-full bg-black object-contain" />
+            <video src={preview} controls playsInline preload="metadata" className="h-full w-full bg-black object-contain" />
           ) : (
             <video ref={videoRef} playsInline muted className="h-full w-full object-cover" style={{ transform: "scaleX(-1)" }} />
           )}
