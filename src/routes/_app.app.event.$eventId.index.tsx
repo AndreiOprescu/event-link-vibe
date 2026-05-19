@@ -7,6 +7,8 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 // TODO: re-enable break rooms
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
+import { DirectChat } from "@/components/app/DirectChat";
+import { ChatSwitcher, type ChatTarget, type ChatSwitcherItems } from "@/components/app/ChatSwitcher";
 import { EventIntakeModal } from "@/components/app/EventIntakeModal";
 import { VideoIntroModal, VideoIntroRecorder } from "@/components/app/VideoIntro";
 import { getInitials } from "@/lib/initials";
@@ -33,7 +35,13 @@ function EventRoom() {
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [activeChat, setActiveChat] = useState<ChatTarget>({ kind: "room" });
   const [focusDiscussionId, setFocusDiscussionId] = useState<string | null>(null);
+
+  // DM bookkeeping
+  type DMRow = { id: string; event_id: string; sender_profile_id: string; recipient_profile_id: string; text: string | null; created_at: string };
+  const [dmRows, setDmRows] = useState<DMRow[]>([]);
+  const [reads, setReads] = useState<{ room: string | null; dm: Map<string, string> }>({ room: null, dm: new Map() });
 
   // Per-event membership: drives the intake modal + video prompt
   type Member = { user_id: string; event_id: string; goal: string; intro: string; intro_video_url: string | null; intro_duration_seconds: number | null };
