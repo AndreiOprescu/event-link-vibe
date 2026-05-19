@@ -556,10 +556,11 @@ function ProfileDrawer({
   const videoUrl = member?.intro_video_url ?? null;
   return (
     <div className="absolute inset-0 z-50 flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div className="m-4 w-full max-w-xl rounded-3xl border border-border bg-popover p-6 shadow-card sm:p-8" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-end">
+      <div className="m-4 flex max-h-[85vh] w-full max-w-xl flex-col rounded-3xl border border-border bg-popover shadow-card" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end p-4 pb-0">
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
+        <div className="flex-1 overflow-y-auto px-6 pb-6 sm:px-8 sm:pb-8">
 
         <div className="flex flex-col items-center text-center">
           {p.avatar_url ? (
