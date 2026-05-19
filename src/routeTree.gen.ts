@@ -17,6 +17,7 @@ import { Route as AppAppRouteImport } from './routes/_app.app'
 import { Route as AppAppIndexRouteImport } from './routes/_app.app.index'
 import { Route as AppAppProfileRouteImport } from './routes/_app.app.profile'
 import { Route as AppAppEventEventIdRouteImport } from './routes/_app.app.event.$eventId'
+import { Route as AppAppEventEventIdIndexRouteImport } from './routes/_app.app.event.$eventId.index'
 import { Route as AppAppEventEventIdBreakRouteImport } from './routes/_app.app.event.$eventId.break'
 import { Route as AppAppEventEventIdBreakRoomIdRouteImport } from './routes/_app.app.event.$eventId.break.$roomId'
 
@@ -59,6 +60,11 @@ const AppAppEventEventIdRoute = AppAppEventEventIdRouteImport.update({
   path: '/event/$eventId',
   getParentRoute: () => AppAppRoute,
 } as any)
+const AppAppEventEventIdIndexRoute = AppAppEventEventIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAppEventEventIdRoute,
+} as any)
 const AppAppEventEventIdBreakRoute = AppAppEventEventIdBreakRouteImport.update({
   id: '/break',
   path: '/break',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppAppIndexRoute
   '/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/app/event/$eventId/break': typeof AppAppEventEventIdBreakRouteWithChildren
+  '/app/event/$eventId/': typeof AppAppEventEventIdIndexRoute
   '/app/event/$eventId/break/$roomId': typeof AppAppEventEventIdBreakRoomIdRoute
 }
 export interface FileRoutesByTo {
@@ -88,8 +95,8 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/app/profile': typeof AppAppProfileRoute
   '/app': typeof AppAppIndexRoute
-  '/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/app/event/$eventId/break': typeof AppAppEventEventIdBreakRouteWithChildren
+  '/app/event/$eventId': typeof AppAppEventEventIdIndexRoute
   '/app/event/$eventId/break/$roomId': typeof AppAppEventEventIdBreakRoomIdRoute
 }
 export interface FileRoutesById {
@@ -103,6 +110,7 @@ export interface FileRoutesById {
   '/_app/app/': typeof AppAppIndexRoute
   '/_app/app/event/$eventId': typeof AppAppEventEventIdRouteWithChildren
   '/_app/app/event/$eventId/break': typeof AppAppEventEventIdBreakRouteWithChildren
+  '/_app/app/event/$eventId/': typeof AppAppEventEventIdIndexRoute
   '/_app/app/event/$eventId/break/$roomId': typeof AppAppEventEventIdBreakRoomIdRoute
 }
 export interface FileRouteTypes {
@@ -116,6 +124,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/event/$eventId'
     | '/app/event/$eventId/break'
+    | '/app/event/$eventId/'
     | '/app/event/$eventId/break/$roomId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -124,8 +133,8 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/app/profile'
     | '/app'
-    | '/app/event/$eventId'
     | '/app/event/$eventId/break'
+    | '/app/event/$eventId'
     | '/app/event/$eventId/break/$roomId'
   id:
     | '__root__'
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/_app/app/'
     | '/_app/app/event/$eventId'
     | '/_app/app/event/$eventId/break'
+    | '/_app/app/event/$eventId/'
     | '/_app/app/event/$eventId/break/$roomId'
   fileRoutesById: FileRoutesById
 }
@@ -206,6 +216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppEventEventIdRouteImport
       parentRoute: typeof AppAppRoute
     }
+    '/_app/app/event/$eventId/': {
+      id: '/_app/app/event/$eventId/'
+      path: '/'
+      fullPath: '/app/event/$eventId/'
+      preLoaderRoute: typeof AppAppEventEventIdIndexRouteImport
+      parentRoute: typeof AppAppEventEventIdRoute
+    }
     '/_app/app/event/$eventId/break': {
       id: '/_app/app/event/$eventId/break'
       path: '/break'
@@ -239,10 +256,12 @@ const AppAppEventEventIdBreakRouteWithChildren =
 
 interface AppAppEventEventIdRouteChildren {
   AppAppEventEventIdBreakRoute: typeof AppAppEventEventIdBreakRouteWithChildren
+  AppAppEventEventIdIndexRoute: typeof AppAppEventEventIdIndexRoute
 }
 
 const AppAppEventEventIdRouteChildren: AppAppEventEventIdRouteChildren = {
   AppAppEventEventIdBreakRoute: AppAppEventEventIdBreakRouteWithChildren,
+  AppAppEventEventIdIndexRoute: AppAppEventEventIdIndexRoute,
 }
 
 const AppAppEventEventIdRouteWithChildren =
