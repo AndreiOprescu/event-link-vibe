@@ -1,16 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, ImageIcon, Linkedin, Loader2, LogOut, Mail, RefreshCw, Sparkles, X } from "lucide-react";
+import { Camera, Check, ImageIcon, Linkedin, Loader2, LogOut, Mail, RefreshCw, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getInitials } from "@/lib/initials";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/app/profile")({
   head: () => ({ meta: [{ title: "Profile — EventLabs" }] }),
   component: Profile,
 });
-
-const EMOJIS = ["🚀", "🦊", "🐼", "🦉", "🐯", "🦄", "🐺", "🐧", "🦋", "🐙", "🐸", "🦁"];
 
 function Profile() {
   const { user, profile, loading } = useAuth();
