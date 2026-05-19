@@ -77,6 +77,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "author", content: "EventLabs" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "EventLabs — Make IRL events unforgettable" },
+      { name: "twitter:title", content: "EventLabs — Make IRL events unforgettable" },
+      { property: "og:description", content: "EventLabs makes real-world events memorable — connect, chat, and remember everyone you met." },
+      { name: "twitter:description", content: "EventLabs makes real-world events memorable — connect, chat, and remember everyone you met." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d412bcb1-d8b5-4897-b4fa-aa99a68cf4e1/id-preview-a9b3f66a--6d0878f5-7c2d-4959-af99-94cbf15916ea.lovable.app-1779187375044.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d412bcb1-d8b5-4897-b4fa-aa99a68cf4e1/id-preview-a9b3f66a--6d0878f5-7c2d-4959-af99-94cbf15916ea.lovable.app-1779187375044.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
