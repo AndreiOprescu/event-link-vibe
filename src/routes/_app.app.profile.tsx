@@ -86,10 +86,9 @@ function Profile() {
           display_name: displayName,
           email,
           company,
+          role,
           linkedin,
           track,
-          goal,
-          emoji,
         })
         .eq("id", profile.id);
       if (error) throw error;
