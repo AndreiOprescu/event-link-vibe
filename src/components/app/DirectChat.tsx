@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile } from "@/hooks/useAuth";
 import { getInitials } from "@/lib/initials";
-import { ChatSwitcher, type ChatTarget } from "./ChatSwitcher";
+import { ChatSwitcher, type ChatTarget, type ChatSwitcherItems } from "./ChatSwitcher";
 
 export type DM = {
   id: string;
@@ -31,7 +31,7 @@ export function DirectChat({
   eventId: string;
   me: Profile;
   peer: Profile;
-  switcherItems: ChatTarget[];
+  switcherItems: ChatSwitcherItems;
   onSwitch: (t: ChatTarget) => void;
   onClose: () => void;
   onMarkRead: () => void;
