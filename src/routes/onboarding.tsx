@@ -211,6 +211,18 @@ function Onboarding() {
         )}
       </div>
 
+      {cameraOpen && (
+        <CameraModal
+          onClose={() => setCameraOpen(false)}
+          onCapture={async (blob) => {
+            await uploadBlob(blob, "jpg", "image/jpeg");
+            setCameraOpen(false);
+          }}
+        />
+      )}
+
+
+
       <div className="mt-10 flex items-center justify-between">
         <button
           onClick={() => (step === 1 ? null : setStep(step - 1))}
