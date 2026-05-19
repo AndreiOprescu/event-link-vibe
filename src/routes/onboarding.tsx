@@ -159,18 +159,20 @@ function Onboarding() {
         )}
 
         {step === 2 && (
-          <Step title="Pick your face." sub="An emoji, a photo, or a quick selfie — your call.">
+          <Step title="Add a profile photo." sub="Optional — upload an image so people in the room can recognize you.">
             <div className="flex flex-col items-center gap-4">
               <div
-                className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full text-5xl shadow-card"
+                className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full font-semibold shadow-card"
                 style={{
                   backgroundColor: profile.color,
                   backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
+                  fontSize: 36,
+                  color: "#0a0a0a",
                 }}
               >
-                {!avatarUrl && emoji}
+                {!avatarUrl && (displayName.trim()[0]?.toUpperCase() ?? "•")}
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
               <div className="flex gap-2">
@@ -189,24 +191,10 @@ function Onboarding() {
                     onClick={() => setAvatarUrl(null)}
                     className="rounded-full border border-border bg-background px-4 py-2 text-xs hover:bg-surface-2"
                   >
-                    Use emoji instead
+                    Remove photo
                   </button>
                 )}
               </div>
-            </div>
-            <div className="mt-2 grid grid-cols-6 gap-3">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => { setEmoji(e); setAvatarUrl(null); }}
-                  className={`flex aspect-square items-center justify-center rounded-2xl border text-3xl transition ${
-                    emoji === e && !avatarUrl ? "border-lime bg-lime/10 shadow-glow" : "border-border bg-surface hover:bg-surface-2"
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
             </div>
           </Step>
         )}
