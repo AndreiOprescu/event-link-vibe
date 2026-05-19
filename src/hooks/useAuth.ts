@@ -15,6 +15,7 @@ export type Profile = {
   goal: string | null;
   track: string | null;
   is_demo: boolean;
+  avatar_url?: string | null;
 };
 
 export function useAuth() {
