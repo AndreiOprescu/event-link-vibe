@@ -22,7 +22,9 @@ function EventRoom() {
   const { eventId } = Route.useParams();
   const { profile: me } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
+  const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
+  const [presentIds, setPresentIds] = useState<string[]>([]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -31,7 +33,7 @@ function EventRoom() {
 
   useEffect(() => {
     supabase.from("events").select("*").eq("id", eventId).maybeSingle().then(({ data }) => setEvent(data as EventRow | null));
-    supabase.from("profiles").select("*").eq("is_demo", true).then(({ data }) => setProfiles((data ?? []) as Profile[]));
+    supabase.from("profiles").select("*").eq("is_demo", true).then(({ data }) => setDemoProfiles((data ?? []) as Profile[]));
     supabase
       .from("event_messages")
       .select("*")
@@ -43,6 +45,7 @@ function EventRoom() {
       });
   }, [eventId]);
 
+  // Realtime: new chat messages
   useEffect(() => {
     const ch = supabase
       .channel(`event-${eventId}-main`)
@@ -55,22 +58,91 @@ function EventRoom() {
     return () => { supabase.removeChannel(ch); };
   }, [eventId]);
 
-  const positions = useMemo<Record<string, Position>>(() => {
-    const out: Record<string, Position> = {};
-    profiles.forEach((p, i) => {
-      const seed = (i * 9301 + 49297) % 233280;
-      out[p.id] = { x: 8 + ((seed % 100) / 100) * 84, y: 18 + (((seed * 7) % 100) / 100) * 70 };
+  // Realtime presence: track who is currently in this event
+  useEffect(() => {
+    if (!me) return;
+    const ch = supabase.channel(`event-${eventId}-presence`, {
+      config: { presence: { key: me.id } },
     });
-    if (me) out[me.id] = { x: 48, y: 50 };
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState();
+      setPresentIds(Object.keys(state));
+    });
+    ch.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ profile_id: me.id, online_at: new Date().toISOString() });
+      }
+    });
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, me?.id]);
+
+  // Fetch profile rows for present users (other than me)
+  useEffect(() => {
+    const others = presentIds.filter((id) => id && id !== me?.id);
+    if (others.length === 0) { setPresentProfiles([]); return; }
+    supabase.from("profiles").select("*").in("id", others).then(({ data }) => {
+      setPresentProfiles((data ?? []) as Profile[]);
+    });
+  }, [presentIds.join("|"), me?.id]);
+
+  // Merge everyone we need to render: demo + present users + me. Dedup by id.
+  const allPeople = useMemo<Profile[]>(() => {
+    const map = new Map<string, Profile>();
+    demoProfiles.forEach((p) => map.set(p.id, p));
+    presentProfiles.forEach((p) => map.set(p.id, p));
+    if (me) map.set(me.id, me);
+    return Array.from(map.values());
+  }, [demoProfiles, presentProfiles, me]);
+
+  // Cluster people into small groups around fixed seating areas — like a real room.
+  const positions = useMemo<Record<string, Position>>(() => {
+    const centers = [
+      { x: 22, y: 30 },
+      { x: 50, y: 24 },
+      { x: 78, y: 32 },
+      { x: 26, y: 66 },
+      { x: 56, y: 74 },
+      { x: 80, y: 60 },
+      { x: 38, y: 48 },
+      { x: 68, y: 50 },
+    ];
+    // Stable order: keep me anchored to a center, fill clusters left-to-right.
+    const ordered = [...allPeople].sort((a, b) => {
+      if (me && a.id === me.id) return -1;
+      if (me && b.id === me.id) return 1;
+      return a.id.localeCompare(b.id);
+    });
+    const groups: string[][] = centers.map(() => []);
+    ordered.forEach((p, i) => {
+      const c = Math.floor(i / 3) % centers.length;
+      groups[c].push(p.id);
+    });
+    const out: Record<string, Position> = {};
+    groups.forEach((ids, ci) => {
+      const center = centers[ci];
+      const n = ids.length;
+      const radius = n <= 1 ? 0 : n === 2 ? 7 : 9;
+      const startAngle = ci * 1.1;
+      ids.forEach((id, k) => {
+        if (n === 1) {
+          out[id] = { x: center.x, y: center.y };
+          return;
+        }
+        const angle = startAngle + (k / n) * Math.PI * 2;
+        out[id] = {
+          x: center.x + Math.cos(angle) * radius,
+          y: center.y + Math.sin(angle) * radius * 0.65,
+        };
+      });
+    });
     return out;
-  }, [profiles, me]);
+  }, [allPeople, me]);
 
   const profileById = useMemo(() => {
     const m = new Map<string, Profile>();
-    profiles.forEach((p) => m.set(p.id, p));
-    if (me) m.set(me.id, me);
+    allPeople.forEach((p) => m.set(p.id, p));
     return m;
-  }, [profiles, me]);
+  }, [allPeople]);
 
   const replyCount = useMemo(() => {
     const c = new Map<string, number>();
