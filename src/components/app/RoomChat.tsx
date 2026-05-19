@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Camera, CornerDownRight, Globe2, Mic, MessageCircle, Pause, Play,
   Send, Square, Trash2, X,
@@ -99,7 +99,7 @@ type PendingMedia = {
 };
 
 export function RoomChat({
-  eventId, roomId, messages, profileById, me, focusDiscussionId, onClose,
+  eventId, roomId, messages, profileById, me, focusDiscussionId, onClose, headerExtra,
 }: {
   eventId: string;
   roomId: string | null;
@@ -108,6 +108,7 @@ export function RoomChat({
   me: Profile | null;
   focusDiscussionId: string | null;
   onClose: () => void;
+  headerExtra?: ReactNode;
 }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -269,7 +270,10 @@ export function RoomChat({
               </div>
             </div>
           </div>
-          <button onClick={onClose}><X className="h-4 w-4 text-muted-foreground" /></button>
+          <div className="flex items-center gap-2">
+            {headerExtra}
+            <button onClick={onClose}><X className="h-4 w-4 text-muted-foreground" /></button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">

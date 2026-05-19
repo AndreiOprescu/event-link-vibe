@@ -7,6 +7,8 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 // TODO: re-enable break rooms
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
+import { DirectChat } from "@/components/app/DirectChat";
+import { ChatSwitcher, type ChatTarget, type ChatSwitcherItems } from "@/components/app/ChatSwitcher";
 import { EventIntakeModal } from "@/components/app/EventIntakeModal";
 import { VideoIntroModal, VideoIntroRecorder } from "@/components/app/VideoIntro";
 import { getInitials } from "@/lib/initials";
@@ -33,7 +35,13 @@ function EventRoom() {
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [activeChat, setActiveChat] = useState<ChatTarget>({ kind: "room" });
   const [focusDiscussionId, setFocusDiscussionId] = useState<string | null>(null);
+
+  // DM bookkeeping
+  type DMRow = { id: string; event_id: string; sender_profile_id: string; recipient_profile_id: string; text: string | null; created_at: string };
+  const [dmRows, setDmRows] = useState<DMRow[]>([]);
+  const [reads, setReads] = useState<{ room: string | null; dm: Map<string, string> }>({ room: null, dm: new Map() });
 
   // Per-event membership: drives the intake modal + video prompt
   type Member = { user_id: string; event_id: string; goal: string; intro: string; intro_video_url: string | null; intro_duration_seconds: number | null };
@@ -91,6 +99,72 @@ function EventRoom() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [eventId]);
+
+  // Load direct messages I'm a participant in for this event + read receipts
+  useEffect(() => {
+    if (!me) return;
+    supabase
+      .from("direct_messages")
+      .select("*")
+      .eq("event_id", eventId)
+      .or(`sender_profile_id.eq.${me.id},recipient_profile_id.eq.${me.id}`)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => setDmRows((data ?? []) as DMRow[]));
+    supabase
+      .from("chat_reads")
+      .select("scope,peer_profile_id,last_read_at")
+      .eq("profile_id", me.id)
+      .eq("event_id", eventId)
+      .then(({ data }) => {
+        const dm = new Map<string, string>();
+        let room: string | null = null;
+        (data ?? []).forEach((r: any) => {
+          if (r.scope === "room") room = r.last_read_at;
+          else if (r.scope === "dm" && r.peer_profile_id) dm.set(r.peer_profile_id, r.last_read_at);
+        });
+        setReads({ room, dm });
+      });
+  }, [eventId, me?.id]);
+
+  // Realtime DMs for me in this event
+  useEffect(() => {
+    if (!me) return;
+    const ch = supabase
+      .channel(`event-${eventId}-dm-${me.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "direct_messages", filter: `event_id=eq.${eventId}` },
+        (payload) => {
+          const row = payload.new as DMRow;
+          if (row.sender_profile_id !== me.id && row.recipient_profile_id !== me.id) return;
+          setDmRows((rs) => (rs.some((x) => x.id === row.id) ? rs : [...rs, row]));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [eventId, me?.id]);
+
+  const markRead = async (target: ChatTarget) => {
+    if (!me) return;
+    const now = new Date().toISOString();
+    if (target.kind === "room") {
+      setReads((r) => ({ ...r, room: now }));
+      await supabase.from("chat_reads").upsert(
+        { profile_id: me.id, event_id: eventId, scope: "room", last_read_at: now },
+        { onConflict: "profile_id,event_id,scope" }
+      );
+    } else {
+      setReads((r) => {
+        const dm = new Map(r.dm);
+        dm.set(target.peerId, now);
+        return { ...r, dm };
+      });
+      await supabase.from("chat_reads").upsert(
+        { profile_id: me.id, event_id: eventId, scope: "dm", peer_profile_id: target.peerId, last_read_at: now },
+        { onConflict: "profile_id,event_id,scope,peer_profile_id" }
+      );
+    }
+  };
 
   // Realtime presence: track who is currently in this event
   useEffect(() => {
@@ -199,10 +273,63 @@ function EventRoom() {
 
   const openThread = (discussionId: string) => {
     setFocusDiscussionId(discussionId);
+    setActiveChat({ kind: "room" });
     setChatOpen(true);
+    if (me) markRead({ kind: "room" });
   };
 
   const selectedUser = selected ? profileById.get(selected) ?? null : null;
+
+  // Switcher items + unread counts
+  const switcherItems = useMemo<ChatSwitcherItems>(() => {
+    if (!me) return { roomUnread: 0, peers: [] };
+    const lastRoom = reads.room ? new Date(reads.room).getTime() : 0;
+    const roomUnread = messages.filter((m) => {
+      if (m.profile_id === me.id) return false;
+      return new Date(m.created_at).getTime() > lastRoom;
+    }).length;
+
+    // Group DMs by peer
+    const byPeer = new Map<string, DMRow[]>();
+    dmRows.forEach((d) => {
+      const peerId = d.sender_profile_id === me.id ? d.recipient_profile_id : d.sender_profile_id;
+      const arr = byPeer.get(peerId) ?? [];
+      arr.push(d);
+      byPeer.set(peerId, arr);
+    });
+    const peers = Array.from(byPeer.entries())
+      .map(([peerId, list]) => {
+        const profile = profileById.get(peerId);
+        if (!profile) return null;
+        const lastRead = reads.dm.get(peerId) ? new Date(reads.dm.get(peerId)!).getTime() : 0;
+        const unread = list.filter((d) => d.sender_profile_id !== me.id && new Date(d.created_at).getTime() > lastRead).length;
+        const lastAt = list.reduce((acc, d) => Math.max(acc, new Date(d.created_at).getTime()), 0);
+        return { profile, unread, lastAt };
+      })
+      .filter((x): x is { profile: Profile; unread: number; lastAt: number } => !!x)
+      .sort((a, b) => b.lastAt - a.lastAt)
+      .map(({ profile, unread }) => ({ profile, unread }));
+    return { roomUnread, peers };
+  }, [me, messages, dmRows, reads, profileById]);
+
+  // If panel is open on a DM, ensure that peer is in the switcher list even with 0 messages
+  const switcherWithActive = useMemo<ChatSwitcherItems>(() => {
+    if (activeChat.kind !== "dm") return switcherItems;
+    if (switcherItems.peers.some((p) => p.profile.id === activeChat.peerId)) return switcherItems;
+    const p = profileById.get(activeChat.peerId);
+    if (!p) return switcherItems;
+    return { ...switcherItems, peers: [{ profile: p, unread: 0 }, ...switcherItems.peers] };
+  }, [switcherItems, activeChat, profileById]);
+
+  const totalUnread = switcherItems.roomUnread + switcherItems.peers.reduce((s, p) => s + p.unread, 0);
+
+  const openChat = (target: ChatTarget) => {
+    setActiveChat(target);
+    setChatOpen(true);
+    setSelected(null);
+    if (target.kind === "room") setFocusDiscussionId(null);
+    markRead(target);
+  };
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -290,11 +417,16 @@ function EventRoom() {
       {/* Open chat FAB */}
       {!chatOpen && (
         <button
-          onClick={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onClick={() => openChat({ kind: "room" })}
           className="absolute bottom-6 right-6 z-30 flex items-center gap-2 rounded-full bg-lime px-5 py-3 text-sm font-semibold text-primary-foreground shadow-glow hover:scale-[1.03]"
         >
           <MessageCircle className="h-4 w-4" />
           Room chat
+          {totalUnread > 0 && (
+            <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-[10px] font-bold text-lime ring-2 ring-lime">
+              {totalUnread}
+            </span>
+          )}
         </button>
       )}
 
@@ -304,12 +436,12 @@ function EventRoom() {
           member={members.get(selectedUser.id) ?? null}
           isMe={!!me && selectedUser.id === me.id}
           onClose={() => setSelected(null)}
-          onChat={() => { setFocusDiscussionId(null); setChatOpen(true); }}
+          onChat={() => openChat({ kind: "dm", peerId: selectedUser.id })}
           onRecord={() => { setSelected(null); setRecorderOpen(true); }}
         />
       )}
 
-      {chatOpen && (
+      {chatOpen && activeChat.kind === "room" && (
         <RoomChat
           eventId={eventId}
           roomId={null}
@@ -318,8 +450,27 @@ function EventRoom() {
           me={me}
           focusDiscussionId={focusDiscussionId}
           onClose={() => { setChatOpen(false); setSelected(null); setFocusDiscussionId(null); }}
+          headerExtra={
+            <ChatSwitcher items={switcherWithActive} current={activeChat} onSelect={openChat} />
+          }
         />
       )}
+
+      {chatOpen && activeChat.kind === "dm" && me && (() => {
+        const peer = profileById.get(activeChat.peerId);
+        if (!peer) return null;
+        return (
+          <DirectChat
+            eventId={eventId}
+            me={me}
+            peer={peer}
+            switcherItems={switcherWithActive}
+            onSwitch={openChat}
+            onClose={() => { setChatOpen(false); setSelected(null); }}
+            onMarkRead={() => markRead({ kind: "dm", peerId: peer.id })}
+          />
+        );
+      })()}
 
       {/* First-time intake modal — required to enter */}
       {needsIntake && user && event && (
@@ -476,7 +627,7 @@ function ProfileDrawer({
         </div>
         {!isMe && (
           <button onClick={onChat} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow">
-            <MessageCircle className="h-4 w-4" /> Open room chat
+            <MessageCircle className="h-4 w-4" /> Start a conversation with {p.display_name.split(" ")[0]}!
           </button>
         )}
       </div>
