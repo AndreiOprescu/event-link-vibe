@@ -143,20 +143,39 @@ function Profile() {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="user"
             className="hidden"
             onChange={onPickFile}
           />
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background py-2 text-xs hover:bg-surface-2 disabled:opacity-60"
-          >
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-            {uploading ? "Uploading…" : avatarUrl ? "Change photo" : "Take a selfie or upload"}
-          </button>
+          <div className="mt-5 space-y-2">
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background py-2 text-xs hover:bg-surface-2 disabled:opacity-60"
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+              {uploading ? "Uploading…" : "Upload photo"}
+            </button>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => setCameraOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-lime py-2 text-xs font-semibold text-primary-foreground shadow-glow hover:scale-[1.01] disabled:opacity-60"
+            >
+              <Camera className="h-3.5 w-3.5" /> Take a selfie
+            </button>
+          </div>
         </div>
+
+        {cameraOpen && (
+          <CameraModal
+            onClose={() => setCameraOpen(false)}
+            onCapture={async (blob) => {
+              await uploadBlob(blob, "jpg", "image/jpeg");
+              setCameraOpen(false);
+            }}
+          />
+        )}
 
         {/* Forms */}
         <div className="space-y-6">
