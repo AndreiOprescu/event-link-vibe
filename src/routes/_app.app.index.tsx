@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, Hash, Plus, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_app/app/")({
   head: () => ({ meta: [{ title: "Your events — EventLabs" }] }),
@@ -21,9 +22,11 @@ type Event = {
 };
 
 function MainScreen() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("live");
   const [code, setCode] = useState("");
   const [events, setEvents] = useState<Event[]>([]);
+  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.from("events").select("*").order("created_at", { ascending: true }).then(({ data }) => {
@@ -31,6 +34,18 @@ function MainScreen() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("event_members")
+      .select("event_id")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        setJoinedIds(new Set((data ?? []).map((r: { event_id: string }) => r.event_id)));
+      });
+  }, [user?.id]);
+
+  const hasJoined = joinedIds.size > 0;
   const filtered = events.filter((e) => e.status === tab);
 
   return (
