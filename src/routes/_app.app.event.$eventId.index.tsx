@@ -550,7 +550,7 @@ function HoverCard({ p }: { p: Profile }) {
   );
 }
 
-type DrawerMember = { intro_video_url: string | null; intro: string | null } | null;
+type DrawerMember = { intro_video_url: string | null; intro: string | null; goal: string | null } | null;
 
 function ProfileDrawer({
   p,
@@ -640,15 +640,20 @@ function ProfileDrawer({
           </div>
         )}
 
-        {p.goal && (
-          <div className="mt-5 rounded-xl border border-lime/30 bg-lime/5 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-lime">Their goal</div>
-            <div className="mt-1 text-sm">{p.goal}</div>
+        {member?.intro && (
+          <div className="mt-5 rounded-xl border border-border bg-background/40 p-3">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {isMe ? "Your intro" : "Intro"}
+            </div>
+            <div className="mt-1 text-sm">{member.intro}</div>
           </div>
         )}
-        {member?.intro && !isMe && (
-          <div className="mt-3 rounded-xl border border-border bg-background/40 p-3 text-sm text-muted-foreground">
-            {member.intro}
+        {member?.goal && (
+          <div className="mt-3 rounded-xl border border-lime/30 bg-lime/5 p-3">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-lime">
+              {isMe ? "Your goal for this event" : "What they want from this event"}
+            </div>
+            <div className="mt-1 text-sm">{member.goal}</div>
           </div>
         )}
         <div className="mt-4 space-y-2 text-sm">
