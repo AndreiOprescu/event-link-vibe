@@ -627,7 +627,7 @@ function ProfileDrawer({
         </div>
         {!isMe && (
           <button onClick={onChat} className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow">
-            <MessageCircle className="h-4 w-4" /> Open room chat
+            <MessageCircle className="h-4 w-4" /> Start a conversation with {p.display_name.split(" ")[0]}!
           </button>
         )}
       </div>
