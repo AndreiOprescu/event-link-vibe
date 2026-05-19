@@ -393,8 +393,8 @@ function ProfileDrawer({ p, onClose, onChat }: { p: Profile; onClose: () => void
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full text-3xl" style={{ backgroundColor: p.color }}>
-            {p.emoji}
+          <div className="flex h-16 w-16 items-center justify-center rounded-full font-semibold" style={{ backgroundColor: p.color, color: "#0a0a0a", fontSize: 22 }}>
+            {getInitials(p.display_name)}
           </div>
           <div>
             <div className="font-display text-xl font-semibold">{p.display_name}</div>
