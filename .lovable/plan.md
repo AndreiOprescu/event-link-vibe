@@ -1,54 +1,68 @@
-## Goal
-Overhaul auth + onboarding + event entry flow: add Google sign-in, email confirmation, photo-only profiles, per-event intake questions, and a video intro.
+# Per-event video intros — promote to modal + larger playback
 
-## 1. Auth (`src/routes/login.tsx`)
-- Subtitle copy → "Sign in to find your people."
-- Add **"Continue with Google"** button above email form using `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/app" })`. Also call `supabase--configure_social_auth` with `providers: ["google"]`.
-- After email signup: do NOT auto-sign-in. Show message: **"Check your inbox — click the link we sent to confirm your account."** (Email confirmation required; do not enable auto-confirm.)
-- After sign-in, redirect to `/app` (events list). Onboarding pop-up will be triggered from there, not from a separate `/onboarding` route redirect.
+## Current state
+- `event_members` table already stores `intro_video_url` + `intro_duration_seconds` per (user_id, event_id).
+- `VideoIntroRecorder` works (camera, 2-min cap, upload to `event-media/intros/{eventId}/{userId}/...`, saves URL on the member row).
+- Today the video step is a small bottom-of-screen "VideoIntroPrompt" toast shown only after the text intake modal — easy to miss.
+- Clicking another user's avatar: if they have a video, a small overlay plays just the video + name; if not, the `ProfileDrawer` shows avatar + name + details (no video).
 
-## 2. Events list copy (`src/routes/_app.app.index.tsx`)
-- Replace "Drop into an event." → **"Welcome back — your rooms are waiting."**
-- Code-entry only shown for events the user hasn't joined before. Past joins persist via new `event_members` table (see §6). Joined events appear automatically in the "live/upcoming" tabs without re-entering a code.
+## What changes
 
-## 3. Profile model — drop emojis, photo-first
-- `AvatarBubble`: when no `avatar_url`, render a **colored circle with initials** (derived from `display_name`) instead of emoji. Keep `color` field for the circle background.
-- Remove emoji picker from profile/onboarding UI everywhere it appears.
-- Profile fallback everywhere a bubble is rendered.
+### 1. First-time video intro as a real popup
+Replace the small `VideoIntroPrompt` toast with a centered modal (`VideoIntroModal`) that appears the first time a user enters an event, right after the existing two-question intake.
 
-## 4. Profile screen (`src/routes/_app.app.profile.tsx`) restructure
-- Rename "Account" section → **"Tell us about yourself"**.
-- Replace `first_name` + `last_name` inputs with a single **Full name** field (maps to `display_name`).
-- Field order: **Full name → Email → Company / University → Role → LinkedIn → Track**.
-- Add **profile picture uploader** (uploads to existing `event-media` bucket under `avatars/<user_id>.jpg`, writes `profiles.avatar_url`).
-- Remove the per-profile "Your goal at events" question from this screen (it moves to the per-event intake).
+Modal contents:
+- Title: "Add a video intro"
+- Short copy explaining the two prompt options.
+- Two suggestion chips the user can tap to pre-fill what they'll talk about:
+  - "Introduce yourself"
+  - "What do you think of the event so far?"
+- Primary button: **Record video** → opens existing `VideoIntroRecorder`.
+- Secondary text button: **Skip for now** → dismisses; user can record later from their own avatar tap.
+- Shown only on first event entry (driven by absence of a row in `event_members` for this user+event — same trigger as today). Will not reappear on subsequent visits.
 
-## 5. Per-event intake pop-up (new component)
-- Trigger: first time a user enters a given event (no row in `event_members` for that user+event).
-- Modal flow, required to enter:
-  1. Welcome line: *"Welcome to {event.title}."*
-  2. **What would you like to get out of this event?** (textarea, required)
-  3. **Introduce yourself.** (short text/bio, required, with helper "A sentence or two.")
-- On submit → insert into new `event_members` (user_id, event_id, goal, intro, joined_at). Subsequent entries skip the modal.
+### 2. Let users add/replace their own video later
+On the event screen, tapping your own avatar (currently does nothing) opens a small "Your intro" panel with:
+- Preview of current video if one exists.
+- Button: **Record new intro** (re-opens `VideoIntroRecorder`, overwrites `intro_video_url`).
 
-## 6. Video intro prompt
-- After modal submit (first time only), show a soft prompt card in the event room: *"Want to introduce yourself on video? Up to 2 minutes — optional."* with Record / Skip buttons.
-- Recording uses `MediaRecorder` (webcam + mic), 120s hard cap with countdown, upload to `event-media` bucket under `intros/<event_id>/<user_id>.webm`.
-- Save `intro_video_url` + `intro_duration` on the `event_members` row.
-- In the event room, every avatar bubble becomes clickable: clicking opens a small overlay that auto-plays that person's intro video (falls back to "no intro yet" if missing).
+### 3. Bigger, unified profile drawer for other users
+Rework `ProfileDrawer` so a single drawer always handles the avatar tap (remove the separate video-only overlay):
 
-## 7. Database changes (one migration)
-- `event_members` table: `user_id uuid`, `event_id text`, `goal text not null`, `intro text not null`, `intro_video_url text`, `intro_duration_seconds int`, `joined_at timestamptz default now()`, PK (user_id, event_id). RLS: select all authenticated, insert/update own row.
-- Storage policies on `event-media` for authenticated upload of own `avatars/` and `intros/` paths.
-- Leave `profiles.goal` / `profiles.emoji` columns in place (unused by UI) to avoid breaking existing code paths.
+```
++----------------------------------+
+|        [Avatar circle]           |
+|        Display Name              |
+|        Role · Company            |
+|                                  |
+|  +----------------------------+  |
+|  |                            |  |
+|  |   <video> 16:9, large      |  |  ← only if intro_video_url
+|  |                            |  |
+|  +----------------------------+  |
+|                                  |
+|  Their goal (lime card)          |
+|  LinkedIn · Email                |
++----------------------------------+
+```
 
-## 8. Out of scope
-- No changes to break-room files (still hidden).
-- No changes to `events` seed data.
-- No deletion of unused columns.
+- Drawer max width grows from `max-w-sm` → `max-w-xl` so the video has real estate.
+- Video element: `aspect-video w-full rounded-2xl bg-black`, `controls autoPlay playsInline`.
+- If the user has no video, drawer renders as today (no empty video box, just a subtle "No intro video yet" line).
+- Remove the separate `playingVideoFor` overlay branch; every avatar tap now routes through `setSelected(a.id)`.
 
-## Technical notes
-- Google OAuth: must call `supabase--configure_social_auth` in same turn as adding the button or first sign-in fails with "provider is not enabled".
-- Email confirmation: keep `auto_confirm_email: false` (default). Update signup success copy.
-- Video upload: use direct `supabase.storage.from('event-media').upload(...)` from browser (RLS-scoped); no server fn needed.
-- Initials helper: first letter of first two whitespace-split words of `display_name`, uppercased.
+### 4. Storage / data
+No schema changes needed. Existing `event-media` bucket + `event_members` columns cover this. Existing storage RLS already scopes writes to `intros/{eventId}/{userId}/...`.
+
+## Files touched
+- `src/components/app/VideoIntro.tsx` — add `VideoIntroModal` (centered popup with the two prompt chips); keep `VideoIntroRecorder` as-is; remove `VideoIntroPrompt` usage (can leave the export for now).
+- `src/routes/_app.app.event.$eventId.index.tsx`
+  - Replace `VideoIntroPrompt` with `VideoIntroModal` in the first-time flow.
+  - Make own-avatar tap open a small "Your intro" panel with a re-record button.
+  - Collapse `playingVideoFor` overlay into `ProfileDrawer`; pass `member` (with `intro_video_url`) into the drawer.
+- `ProfileDrawer` (same file) — widen, render large video at top under name + avatar, keep goal/links below.
+
+## Out of scope
+- No DB migration.
+- No changes to the text intake modal questions, auth, or events list.
+- Break-room feature stays hidden.
