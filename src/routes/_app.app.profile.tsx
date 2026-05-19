@@ -16,13 +16,12 @@ function Profile() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [emoji, setEmoji] = useState("🚀");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
   const [linkedin, setLinkedin] = useState("");
   const [track, setTrack] = useState("");
-  const [goal, setGoal] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [color, setColor] = useState("#A3E635");
   const [uploading, setUploading] = useState(false);
@@ -30,13 +29,12 @@ function Profile() {
 
   useEffect(() => {
     if (!profile) return;
-    setEmoji(profile.emoji);
     setDisplayName(profile.display_name);
     setEmail(profile.email ?? "");
     setCompany(profile.company ?? "");
+    setRole(profile.role ?? "");
     setLinkedin(profile.linkedin ?? "");
     setTrack(profile.track ?? "");
-    setGoal(profile.goal ?? "");
     setAvatarUrl(profile.avatar_url ?? null);
     setColor(profile.color);
   }, [profile]);
