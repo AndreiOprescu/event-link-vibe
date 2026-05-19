@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Camera, CornerDownRight, Globe2, Mic, MessageCircle, Pause, Play,
   Send, Square, Trash2, X,
@@ -108,7 +108,7 @@ export function RoomChat({
   me: Profile | null;
   focusDiscussionId: string | null;
   onClose: () => void;
-  headerExtra?: React.ReactNode;
+  headerExtra?: ReactNode;
 }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
