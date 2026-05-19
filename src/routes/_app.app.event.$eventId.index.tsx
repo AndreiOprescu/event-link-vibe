@@ -278,6 +278,57 @@ function EventRoom() {
 
   const selectedUser = selected ? profileById.get(selected) ?? null : null;
 
+  // Switcher items + unread counts
+  const switcherItems = useMemo<ChatSwitcherItems>(() => {
+    if (!me) return { roomUnread: 0, peers: [] };
+    const lastRoom = reads.room ? new Date(reads.room).getTime() : 0;
+    const roomUnread = messages.filter((m) => {
+      if (m.profile_id === me.id) return false;
+      return new Date(m.created_at).getTime() > lastRoom;
+    }).length;
+
+    // Group DMs by peer
+    const byPeer = new Map<string, DMRow[]>();
+    dmRows.forEach((d) => {
+      const peerId = d.sender_profile_id === me.id ? d.recipient_profile_id : d.sender_profile_id;
+      const arr = byPeer.get(peerId) ?? [];
+      arr.push(d);
+      byPeer.set(peerId, arr);
+    });
+    const peers = Array.from(byPeer.entries())
+      .map(([peerId, list]) => {
+        const profile = profileById.get(peerId);
+        if (!profile) return null;
+        const lastRead = reads.dm.get(peerId) ? new Date(reads.dm.get(peerId)!).getTime() : 0;
+        const unread = list.filter((d) => d.sender_profile_id !== me.id && new Date(d.created_at).getTime() > lastRead).length;
+        const lastAt = list.reduce((acc, d) => Math.max(acc, new Date(d.created_at).getTime()), 0);
+        return { profile, unread, lastAt };
+      })
+      .filter((x): x is { profile: Profile; unread: number; lastAt: number } => !!x)
+      .sort((a, b) => b.lastAt - a.lastAt)
+      .map(({ profile, unread }) => ({ profile, unread }));
+    return { roomUnread, peers };
+  }, [me, messages, dmRows, reads, profileById]);
+
+  // If panel is open on a DM, ensure that peer is in the switcher list even with 0 messages
+  const switcherWithActive = useMemo<ChatSwitcherItems>(() => {
+    if (activeChat.kind !== "dm") return switcherItems;
+    if (switcherItems.peers.some((p) => p.profile.id === activeChat.peerId)) return switcherItems;
+    const p = profileById.get(activeChat.peerId);
+    if (!p) return switcherItems;
+    return { ...switcherItems, peers: [{ profile: p, unread: 0 }, ...switcherItems.peers] };
+  }, [switcherItems, activeChat, profileById]);
+
+  const totalUnread = switcherItems.roomUnread + switcherItems.peers.reduce((s, p) => s + p.unread, 0);
+
+  const openChat = (target: ChatTarget) => {
+    setActiveChat(target);
+    setChatOpen(true);
+    setSelected(null);
+    if (target.kind === "room") setFocusDiscussionId(null);
+    markRead(target);
+  };
+
   return (
     <div className="relative h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Top bar */}
