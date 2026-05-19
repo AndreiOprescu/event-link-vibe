@@ -189,7 +189,7 @@ function EventRoom() {
             </span>
           </div>
         )}
-        <BreakRoomPicker eventId={eventId} goal={me?.goal} />
+        <div />
       </div>
 
       {/* Room floor */}
