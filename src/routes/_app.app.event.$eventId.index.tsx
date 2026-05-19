@@ -28,9 +28,7 @@ function EventRoom() {
   const { eventId } = Route.useParams();
   const { profile: me, user } = useAuth();
   const [event, setEvent] = useState<EventRow | null>(null);
-  const [demoProfiles, setDemoProfiles] = useState<Profile[]>([]);
-  const [presentProfiles, setPresentProfiles] = useState<Profile[]>([]);
-  const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<Profile[]>([]);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [hover, setHover] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,7 +54,6 @@ function EventRoom() {
 
   useEffect(() => {
     supabase.from("events").select("*").eq("id", eventId).maybeSingle().then(({ data }) => setEvent(data as EventRow | null));
-    supabase.from("profiles").select("*").eq("is_demo", true).then(({ data }) => setDemoProfiles((data ?? []) as Profile[]));
     supabase
       .from("event_messages")
       .select("*")
@@ -171,41 +168,22 @@ function EventRoom() {
     }
   };
 
-  // Realtime presence: track who is currently in this event
+  // Fetch profile rows for everyone who has joined this event (members), regardless of online state.
   useEffect(() => {
-    if (!me) return;
-    const ch = supabase.channel(`event-${eventId}-presence`, {
-      config: { presence: { key: me.id } },
+    const userIds = Array.from(membersByUserId.keys());
+    if (userIds.length === 0) { setMemberProfiles([]); return; }
+    supabase.from("profiles").select("*").in("user_id", userIds).then(({ data }) => {
+      setMemberProfiles((data ?? []) as Profile[]);
     });
-    ch.on("presence", { event: "sync" }, () => {
-      const state = ch.presenceState();
-      setPresentIds(Object.keys(state));
-    });
-    ch.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        await ch.track({ profile_id: me.id, online_at: new Date().toISOString() });
-      }
-    });
-    return () => { supabase.removeChannel(ch); };
-  }, [eventId, me?.id]);
+  }, [membersByUserId]);
 
-  // Fetch profile rows for present users (other than me)
-  useEffect(() => {
-    const others = presentIds.filter((id) => id && id !== me?.id);
-    if (others.length === 0) { setPresentProfiles([]); return; }
-    supabase.from("profiles").select("*").in("id", others).then(({ data }) => {
-      setPresentProfiles((data ?? []) as Profile[]);
-    });
-  }, [presentIds.join("|"), me?.id]);
-
-  // Merge everyone we need to render: demo + present users + me. Dedup by id.
+  // Merge everyone we need to render: event members + me. Dedup by id.
   const allPeople = useMemo<Profile[]>(() => {
     const map = new Map<string, Profile>();
-    demoProfiles.forEach((p) => map.set(p.id, p));
-    presentProfiles.forEach((p) => map.set(p.id, p));
+    memberProfiles.forEach((p) => map.set(p.id, p));
     if (me) map.set(me.id, me);
     return Array.from(map.values());
-  }, [demoProfiles, presentProfiles, me]);
+  }, [memberProfiles, me]);
 
   // Cluster people into small groups around fixed seating areas — like a real room.
   const positions = useMemo<Record<string, Position>>(() => {
