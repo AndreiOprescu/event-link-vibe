@@ -184,7 +184,7 @@ function EventRoom() {
             <span className="text-foreground">{event.title}</span>
             <span className="ml-2 flex items-center gap-1 text-lime">
               <span className="h-1.5 w-1.5 rounded-full bg-lime pulse-lime" />
-              {profiles.length + 1}
+              {allPeople.length}
             </span>
           </div>
         )}
@@ -193,9 +193,10 @@ function EventRoom() {
 
       {/* Room floor */}
       <div className="tile-floor absolute inset-0">
-        {profiles.map((a) => {
+        {allPeople.map((a) => {
           const p = positions[a.id];
           if (!p) return null;
+          const isMe = me?.id === a.id;
           const disc = activeDiscussionByProfile.get(a.id);
           const count = disc ? replyCount.get(disc.id) ?? 0 : 0;
           const bubbleSize = Math.min(140, 48 + count * 8);
@@ -207,14 +208,16 @@ function EventRoom() {
               key={a.id}
               className="absolute"
               style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -50%)" }}
-              onMouseEnter={() => setHover(a.id)}
+              onMouseEnter={() => !isMe && setHover(a.id)}
               onMouseLeave={() => setHover(null)}
             >
               <div className="drift" style={{ animationDelay: `${delay}s`, animationDuration: `${duration}s` }}>
                 {disc && (
                   <button
                     onClick={() => openThread(disc.id)}
-                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-border bg-popover px-3 py-1.5 text-xs shadow-card transition hover:border-lime hover:scale-105"
+                    className={`absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border px-3 py-1.5 text-xs transition hover:scale-105 ${
+                      isMe ? "border-lime/50 bg-popover shadow-glow" : "border-border bg-popover shadow-card hover:border-lime"
+                    }`}
                     style={{ minWidth: bubbleSize, maxWidth: 240 }}
                     title={`${count} repl${count === 1 ? "y" : "ies"}`}
                   >
@@ -228,48 +231,26 @@ function EventRoom() {
                     )}
                   </button>
                 )}
-                <div className="bubble-halo">
-                  <AvatarBubble user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }} size={56} label onClick={() => setSelected(a.id)} />
+                <div className={isMe ? "bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background" : "bubble-halo"}>
+                  <AvatarBubble
+                    user={{ id: a.id, name: a.display_name, emoji: a.emoji, color: a.color, avatar_url: a.avatar_url }}
+                    size={isMe ? 64 : 56}
+                    label={!isMe}
+                    onClick={isMe ? undefined : () => setSelected(a.id)}
+                  />
                 </div>
-                {hover === a.id && <HoverCard p={a} />}
+                {isMe && me && (
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-center">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime" />
+                    <span className="max-w-[100px] truncate text-[11px] font-semibold text-foreground">{me.display_name}</span>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-lime">you</span>
+                  </div>
+                )}
+                {!isMe && hover === a.id && <HoverCard p={a} />}
               </div>
             </div>
           );
         })}
-
-        {me && positions[me.id] && (() => {
-          const disc = activeDiscussionByProfile.get(me.id);
-          const count = disc ? replyCount.get(disc.id) ?? 0 : 0;
-          const bubbleSize = Math.min(140, 48 + count * 8);
-          return (
-            <div className="absolute" style={{ left: `${positions[me.id].x}%`, top: `${positions[me.id].y}%`, transform: "translate(-50%, -50%)" }}>
-              <div className="drift" style={{ animationDelay: "-1.5s", animationDuration: "7s" }}>
-                {disc && (
-                  <button
-                    onClick={() => openThread(disc.id)}
-                    className="absolute left-1/2 -translate-x-1/2 -top-3 -translate-y-full rounded-2xl border border-lime/50 bg-popover px-3 py-1.5 text-xs shadow-glow transition hover:scale-105"
-                    style={{ minWidth: bubbleSize, maxWidth: 240 }}
-                  >
-                    <div className="truncate" style={{ fontSize: Math.min(14, 11 + count * 0.3) }}>{mediaLabel(disc)}</div>
-                    {count > 0 && (
-                      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-lime">
-                        {count} repl{count === 1 ? "y" : "ies"}
-                      </div>
-                    )}
-                  </button>
-                )}
-                <div className="bubble-halo rounded-full ring-4 ring-lime ring-offset-2 ring-offset-background">
-                  <AvatarBubble user={{ id: me.id, name: me.display_name, emoji: me.emoji, color: me.color, avatar_url: me.avatar_url }} size={64} />
-                </div>
-                <div className="mt-1 flex items-center justify-center gap-1.5 text-center">
-                  <span className="h-1.5 w-1.5 rounded-full bg-lime" />
-                  <span className="max-w-[100px] truncate text-[11px] font-semibold text-foreground">{me.display_name}</span>
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-lime">you</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Open chat FAB */}
