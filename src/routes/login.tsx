@@ -16,6 +16,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
 
   useEffect(() => {
@@ -24,8 +25,30 @@ function LoginPage() {
     });
   }, [nav]);
 
+  const friendlyError = (e: any): string => {
+    const code = e?.code ?? e?.error?.code;
+    const msg = e?.message ?? "";
+    if (code === "weak_password" || /weak|pwned|breach/i.test(msg)) {
+      return "That password has shown up in a known data breach. Pick a longer or more unique one.";
+    }
+    if (code === "user_already_exists" || code === "email_exists" || /already registered|already exists/i.test(msg)) {
+      return "An account with this email already exists. Try signing in.";
+    }
+    if (code === "invalid_credentials" || /invalid login|invalid credentials/i.test(msg)) {
+      return "That email and password don't match.";
+    }
+    if (code === "email_not_confirmed" || /email not confirmed|confirm your email/i.test(msg)) {
+      return "Confirm your email first — check your inbox for the link.";
+    }
+    if (code === "over_email_send_rate_limit" || /rate limit/i.test(msg)) {
+      return "Too many attempts. Wait a moment and try again.";
+    }
+    return msg || "Something went wrong. Try again.";
+  };
+
   const submit = async () => {
     setBusy(true);
+    setError(null);
     try {
       if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -55,7 +78,9 @@ function LoginPage() {
         setMode("signin");
       }
     } catch (e: any) {
-      toast.error(e.message ?? "Something went wrong");
+      const friendly = friendlyError(e);
+      setError(friendly);
+      toast.error(friendly);
     } finally {
       setBusy(false);
     }
@@ -64,6 +89,7 @@ function LoginPage() {
   const title = mode === "signin" ? "Welcome back." : mode === "signup" ? "Join the room." : "Reset password.";
   const sub = mode === "signin" ? "Sign in to drop into your events." : mode === "signup" ? "Create your account in seconds." : "We'll email you a reset link.";
   const cta = mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Send link";
+  const disabled = busy || (mode === "signup" && password.length < 8);
 
   return (
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
@@ -77,33 +103,61 @@ function LoginPage() {
           <h2 className="font-display text-2xl font-semibold">{title}</h2>
           <p className="mt-2 text-sm text-muted-foreground">{sub}</p>
 
-          <Field icon={Mail} type="email" placeholder="you@event.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Field
+            icon={Mail}
+            type="email"
+            placeholder="you@event.com"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }}
+          />
           {mode !== "forgot" && (
-            <Field icon={Lock} type="password" placeholder="Password (min 6 chars)" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <>
+              <Field
+                icon={Lock}
+                type="password"
+                placeholder={mode === "signup" ? "Password (8+ chars, not a common one)" : "Password"}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+              />
+              {mode === "signup" && (
+                <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Avoid passwords you've used elsewhere — we block ones found in known breaches.
+                </p>
+              )}
+            </>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive"
+            >
+              {error}
+            </div>
           )}
 
           <button
-            disabled={busy}
+            disabled={disabled}
             onClick={submit}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.01] disabled:opacity-50"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-lime py-3 text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "…" : cta} <ArrowRight className="h-4 w-4" />
           </button>
 
           {mode === "signin" && (
             <div className="mt-6 flex items-center justify-between text-xs">
-              <button onClick={() => setMode("forgot")} className="text-muted-foreground hover:text-lime">Forgot password?</button>
-              <button onClick={() => setMode("signup")} className="text-muted-foreground hover:text-lime">Create account →</button>
+              <button onClick={() => { setMode("forgot"); setError(null); }} className="text-muted-foreground hover:text-lime">Forgot password?</button>
+              <button onClick={() => { setMode("signup"); setError(null); }} className="text-muted-foreground hover:text-lime">Create account →</button>
             </div>
           )}
           {mode === "signup" && (
             <p className="mt-6 text-center text-xs text-muted-foreground">
               Already a member?{" "}
-              <button onClick={() => setMode("signin")} className="text-lime hover:underline">Sign in</button>
+              <button onClick={() => { setMode("signin"); setError(null); }} className="text-lime hover:underline">Sign in</button>
             </p>
           )}
           {mode === "forgot" && (
-            <button onClick={() => setMode("signin")} className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground">
+            <button onClick={() => { setMode("signin"); setError(null); }} className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground">
               ← Back to sign in
             </button>
           )}
