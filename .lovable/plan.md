@@ -1,49 +1,31 @@
-## Goal
+## What to change
 
-After signup, send the user to a real profile-setup screen (name, company, role, LinkedIn, track, optional photo) that **saves to their profile**. Only after that can they enter `/app`, pick an event, and see the per-event 2-question intake popup.
+### 1. Spread personas evenly across the room
+**File:** `src/routes/_app.app.event.$eventId.index.tsx` (`positions` useMemo, lines 188–230)
 
-Today the `/onboarding` screen is a static demo — none of the inputs are wired up, so signups go straight to `/app` with an empty profile.
+Replace the 8-cluster seating layout (which packs 3 people per cluster and causes overlap) with an even scatter that:
+- Anchors `me` near the center-bottom.
+- Distributes everyone else using a deterministic Poisson-disc-style placement on the 100×100 percentage grid: a sequence of candidate points seeded from the profile id, accepted only if they sit ≥ ~14% from every already-placed person and ≥ ~10% from the edges.
+- Falls back to the best candidate after N tries so we never silently drop a person.
 
-## Changes
+Result: avatars are spread across the whole floor and never touch, regardless of headcount (up to ~30).
 
-### 1. Database
+### 2. Make the profile pop-up scrollable
+**File:** `src/routes/_app.app.event.$eventId.index.tsx` (`ProfileDrawer`, lines 549–551)
 
-Add a `profile_completed boolean not null default false` column to `profiles` so we can tell first-time users apart from returning ones reliably (doesn't depend on guessing from field contents).
+Cap the card height and make only the inner content scroll:
+- Outer wrapper stays the centered overlay.
+- Inner card: `max-h-[85vh] flex flex-col`, with the close button row stuck to the top and the body wrapped in a `flex-1 overflow-y-auto` section. The page behind no longer scrolls; the modal contents do.
 
-### 2. `/onboarding` — turn into the real first-time profile setup
+### 3. Fix room-chat uploads (photos, videos, voice) and video playback
+**Root cause:** the `event-media` storage bucket has policies that only allow inserts under `avatars/<userId>/...` or `intros/<eventId>/<userId>/...`. Room-chat uploads write to `<eventId>/<profileId>/<uuid>.<ext>` (see `uploadEventMedia` in `src/components/app/RoomChat.tsx`, line 73), so every insert is rejected by RLS → no media is stored → the `<video>`/`<img>`/`<audio>` tags in the feed never have a real URL → "videos not viewable".
 
-Rewrite `src/routes/onboarding.tsx`:
-- Require an authenticated session (redirect to `/login` if none).
-- Prefill from existing `profiles` row (so users who refresh don't lose progress).
-- Two short steps:
-  1. **About you** — display name (required), company / university, role, LinkedIn, track picker.
-  2. **Your face** — emoji picker + optional "Upload photo" / "Take a selfie" (reuse the same upload helper used in `_app.app.profile.tsx`).
-- On finish: `update profiles set display_name, company, role, linkedin, track, emoji, color, avatar_url, profile_completed = true where user_id = auth.uid()`, then `navigate({ to: "/app" })`.
-- Remove the email/password fields from the onboarding form (account already exists at this point).
+**Migration (run via supabase--migration):** add two policies on `storage.objects`:
+- INSERT for `authenticated` when `bucket_id = 'event-media'` and the path is `<eventId>/<auth.uid()-owned profile>/...`. Concretely: first folder is any text, second folder is a profile id that belongs to `auth.uid()` (checked via the existing `public.owns_profile` function).
+- (Reads are already covered by `event_media_authed_read` + the bucket being public.)
 
-### 3. Route the user through onboarding after signup
+No code change needed in `RoomChat.tsx` for the upload path itself — once the policy lands, the existing `supabase.storage.from('event-media').upload(...)` call succeeds and the inline `<video controls>` / `<img>` / `VoiceMessage` components render the returned public URL.
 
-- `src/routes/login.tsx`: after a successful `signUp` and after Google OAuth, navigate to `/onboarding` instead of `/app`. (Sign-in path still goes to `/app`.)
-- `src/routes/_app.tsx`: once `profile` is loaded, if `profile.profile_completed === false`, redirect to `/onboarding`. This catches Google users on first login and anyone who bailed mid-setup.
-- `/onboarding` itself: if `profile_completed === true`, send them straight to `/app` (so the link isn't a trap for returning users).
-
-### 4. Per-event intake stays as-is
-
-`EventIntakeModal` keeps popping up the first time a user opens an event (gated by the existing `event_members` row check). No changes needed — it just won't be the user's *first* prompt anymore.
-
-## Resulting flow
-
-```text
-Sign up  ->  /onboarding (profile setup, saved to profiles)
-          ->  /app (events list)
-          ->  pick an event
-          ->  /app/event/:id  (2-question EventIntakeModal, first visit only)
-```
-
-## Files touched
-
-- `supabase/migrations/...` — add `profile_completed` column.
-- `src/routes/onboarding.tsx` — rewrite as real profile setup form.
-- `src/routes/login.tsx` — post-signup + post-OAuth redirect to `/onboarding`.
-- `src/routes/_app.tsx` — gate on `profile_completed`.
-- `src/hooks/useAuth.ts` — add `profile_completed` to the `Profile` type.
+## Out of scope
+- No changes to the camera capture UX, the voice recorder, or message rendering — those already work once the upload succeeds.
+- No demo persona / logout-persistence changes (already done in earlier turn).
