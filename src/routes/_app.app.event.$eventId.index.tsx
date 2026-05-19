@@ -41,7 +41,7 @@ function EventRoom() {
   const [memberLoaded, setMemberLoaded] = useState(false);
   const [showVideoPrompt, setShowVideoPrompt] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
-  const [playingVideoFor, setPlayingVideoFor] = useState<string | null>(null);
+  
 
   const myMember = user ? members.get(user.id) ?? null : null;
   const needsIntake = memberLoaded && !!user && !myMember;
