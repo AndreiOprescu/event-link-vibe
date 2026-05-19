@@ -1,35 +1,35 @@
-## Goal
-Split the single photo button on `/app/profile` into two distinct actions:
-1. **Upload from gallery / files** — opens a standard file picker.
-2. **Take a selfie** — opens the device camera, lets the user capture a still, confirm, and upload it.
+## Diagnosis
 
-## Behavior
+Signup is hitting `POST /auth/v1/signup` and returning **422 `weak_password`** — the password `Test123!` is in the HIBP breached-password list. Your project has leaked-password protection enabled, so Supabase rejects it. The request itself works fine; the UX just hides the reason.
 
-### Button 1 — "Upload photo"
-- Hidden `<input type="file" accept="image/*">` (no `capture` attribute, so desktop and mobile both show the file/gallery picker).
-- Reuses the existing upload + DB-update flow.
+```
+{"code":"weak_password","message":"Password is known to be weak and easy to guess, please choose a different one.","weak_password":{"reasons":["pwned"]}}
+```
 
-### Button 2 — "Take a selfie"
-- Opens a modal/sheet that requests the camera via `navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })`.
-- Shows a live `<video>` preview (mirrored), a circular framing overlay, and a "Capture" button.
-- On capture: draw the current frame to a `<canvas>` at a reasonable max size (e.g. 720×720, square center-cropped), then `canvas.toBlob(..., "image/jpeg", 0.9)`.
-- Show a "Retake / Use photo" confirm step. On confirm, run the same upload flow as button 1.
-- On close (or after upload), stop all tracks (`stream.getTracks().forEach(t => t.stop())`) so the camera light turns off.
-- Handle permission denial / no camera: show a small inline error in the modal and a retry button.
+Today the login screen only shows a `toast.error(...)`, which is easy to miss on a 622px-wide viewport, and the placeholder still says "Password (min 6 chars)" — no hint that the password also has to not be in a known breach.
 
-### Layout
-Stack the two buttons vertically under the avatar in the profile card. Primary-looking outlined button for "Upload photo" + lime-filled button for "Take a selfie" (since selfie is the new highlight action). Show one shared "Uploading…" state on whichever flow is active.
+## Fix
 
-## Files to touch
-- `src/routes/_app.app.profile.tsx` — split the existing button, add the camera modal component (kept in the same file, small).
-- No DB / storage / RLS changes — reuses the existing `avatars/{user_id}/...` flow added last turn.
+Two small, focused changes — no DB/auth-config changes:
+
+1. **`src/routes/login.tsx`** — surface the real error inline:
+   - Add an `error` state and render it as a red inline banner inside the form card, above the CTA button (so it can't be missed when the toast is off-screen).
+   - In `submit()`, map known Supabase auth error codes to human copy:
+     - `weak_password` → "That password has shown up in a known data breach. Pick a longer or more unique one."
+     - `user_already_exists` / `email_exists` → "An account with this email already exists. Try signing in."
+     - `invalid_credentials` → "That email and password don't match."
+     - `email_not_confirmed` → "Confirm your email first — check your inbox for the link."
+     - Otherwise fall back to `error.message`.
+   - Keep the toast as a secondary signal.
+2. **Password field guidance** — update the placeholder/helper to:
+   - Placeholder: `Password (8+ chars, not a common one)`
+   - Under the field, in signup mode only, add a one-line helper: `Avoid passwords you've used elsewhere — we block ones found in known breaches.`
+   - Client-side, when in `signup` mode, disable the button until `password.length >= 8`.
+
+That's it. Leaked-password protection is a good default — don't turn it off.
 
 ## Out of scope
-- Cropping UI beyond the auto square center-crop.
-- Filters, retouching, multi-camera switching (front/back toggle) — front camera only.
-- Browser-permission deep links / OS-level help.
 
-## Technical notes
-- `getUserMedia` requires HTTPS (preview + published Lovable URLs are already HTTPS — fine).
-- The modal must always release the camera in a `useEffect` cleanup and on close/capture/error so the indicator light doesn't stay on.
-- Mirror only the preview (`transform: scaleX(-1)` on the `<video>`), NOT the captured canvas — otherwise the saved photo is flipped.
+- Disabling HIBP. Keep it on for security.
+- Password-strength meter / zxcvbn — out of scope for this fix.
+- Changes to Google/OAuth, email confirmation, or any DB schema.
