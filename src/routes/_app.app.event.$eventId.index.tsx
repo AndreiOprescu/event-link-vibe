@@ -150,8 +150,8 @@ function EventRoom() {
     if (target.kind === "room") {
       setReads((r) => ({ ...r, room: now }));
       await supabase.from("chat_reads").upsert(
-        { profile_id: me.id, event_id: eventId, scope: "room", peer_profile_id: null, last_read_at: now },
-        { onConflict: "profile_id,event_id,scope,peer_profile_id" }
+        { profile_id: me.id, event_id: eventId, scope: "room", last_read_at: now },
+        { onConflict: "profile_id,event_id,scope" }
       );
     } else {
       setReads((r) => {
