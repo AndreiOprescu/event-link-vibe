@@ -195,6 +195,7 @@ function Onboarding() {
                   className="flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow hover:scale-[1.01] disabled:opacity-60"
                 >
                   <Camera className="h-3.5 w-3.5" /> Take a selfie
+                </button>
                 {avatarUrl && (
                   <button
                     type="button"
