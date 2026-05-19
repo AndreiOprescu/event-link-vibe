@@ -185,46 +185,54 @@ function EventRoom() {
     return Array.from(map.values());
   }, [memberProfiles, me]);
 
-  // Cluster people into small groups around fixed seating areas — like a real room.
+  // Spread people evenly across the floor with a deterministic Poisson-disc-style scatter.
   const positions = useMemo<Record<string, Position>>(() => {
-    const centers = [
-      { x: 22, y: 30 },
-      { x: 50, y: 24 },
-      { x: 78, y: 32 },
-      { x: 26, y: 66 },
-      { x: 56, y: 74 },
-      { x: 80, y: 60 },
-      { x: 38, y: 48 },
-      { x: 68, y: 50 },
-    ];
-    // Stable order: keep me anchored to a center, fill clusters left-to-right.
     const ordered = [...allPeople].sort((a, b) => {
       if (me && a.id === me.id) return -1;
       if (me && b.id === me.id) return 1;
       return a.id.localeCompare(b.id);
     });
-    const groups: string[][] = centers.map(() => []);
-    ordered.forEach((p, i) => {
-      const c = Math.floor(i / 3) % centers.length;
-      groups[c].push(p.id);
-    });
+
+    // Seeded RNG so layout is stable per profile id.
+    const rng = (seedStr: string) => {
+      let s = 0;
+      for (let i = 0; i < seedStr.length; i++) s = (s * 31 + seedStr.charCodeAt(i)) >>> 0;
+      return () => {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        return s / 0xffffffff;
+      };
+    };
+
+    const margin = 12; // % from edges
+    const minDist = Math.max(10, 22 - ordered.length * 0.4); // shrink as room fills
+    const placed: Array<{ id: string; x: number; y: number }> = [];
     const out: Record<string, Position> = {};
-    groups.forEach((ids, ci) => {
-      const center = centers[ci];
-      const n = ids.length;
-      const radius = n <= 1 ? 0 : n === 2 ? 7 : 9;
-      const startAngle = ci * 1.1;
-      ids.forEach((id, k) => {
-        if (n === 1) {
-          out[id] = { x: center.x, y: center.y };
-          return;
+
+    ordered.forEach((p, idx) => {
+      // Anchor "me" near center-bottom for orientation.
+      if (me && p.id === me.id) {
+        const pos = { x: 50, y: 72 };
+        out[p.id] = pos;
+        placed.push({ id: p.id, ...pos });
+        return;
+      }
+      const rand = rng(p.id + ":" + idx);
+      let best = { x: 50, y: 50, dist: -1 };
+      for (let tries = 0; tries < 60; tries++) {
+        const x = margin + rand() * (100 - margin * 2);
+        const y = margin + rand() * (100 - margin * 2);
+        let nearest = Infinity;
+        for (const q of placed) {
+          const dx = x - q.x;
+          const dy = (y - q.y) * 1.4; // floor is wider than tall visually
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < nearest) nearest = d;
         }
-        const angle = startAngle + (k / n) * Math.PI * 2;
-        out[id] = {
-          x: center.x + Math.cos(angle) * radius,
-          y: center.y + Math.sin(angle) * radius * 0.65,
-        };
-      });
+        if (nearest >= minDist) { best = { x, y, dist: nearest }; break; }
+        if (nearest > best.dist) best = { x, y, dist: nearest };
+      }
+      out[p.id] = { x: best.x, y: best.y };
+      placed.push({ id: p.id, x: best.x, y: best.y });
     });
     return out;
   }, [allPeople, me]);
