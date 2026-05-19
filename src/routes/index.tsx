@@ -34,20 +34,23 @@ function Landing() {
     <div className="relative min-h-screen overflow-hidden bg-background">
       {/* Rising bubbles backdrop */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        {BUBBLES.map((b, i) => (
-          <span
-            key={i}
-            className="bubble"
-            style={{
-              left: b.left,
-              width: `${b.size}px`,
-              height: `${b.size}px`,
-              opacity: b.opacity,
-              animationDuration: `${b.duration}s`,
-              animationDelay: `${b.delay}s`,
-            }}
-          />
-        ))}
+        {BUBBLES.map((b, i) => {
+          const variants = ["bubble--coral", "bubble--peach", "bubble--butter", "bubble--blush", "bubble--orchid", "bubble--sky"];
+          return (
+            <span
+              key={i}
+              className={`bubble ${variants[i % variants.length]}`}
+              style={{
+                left: b.left,
+                width: `${b.size}px`,
+                height: `${b.size}px`,
+                opacity: b.opacity,
+                animationDuration: `${b.duration}s`,
+                animationDelay: `${b.delay}s`,
+              }}
+            />
+          );
+        })}
       </div>
 
       <div className="relative z-10">

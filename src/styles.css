@@ -40,6 +40,10 @@
   --color-sky-soft: var(--sky-soft);
   --color-terracotta: var(--terracotta);
   --color-navy: var(--navy);
+  --color-blush: var(--blush);
+  --color-butter: var(--butter);
+  --color-orchid: var(--orchid);
+  --color-peach: var(--peach);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
 
@@ -65,16 +69,20 @@
   /* Coral — primary warm accent (the salmon/red cards) */
   --coral: oklch(0.72 0.18 32);
 
-  /* Signature lime (kept — matches the lime card in the reference) */
-  --lime: oklch(0.86 0.19 125);
-  --lime-glow: oklch(0.86 0.19 125 / 0.55);
+  /* `--lime` retained as a token name but repurposed to coral-poppy.
+     No green anywhere in the palette. */
+  --lime: oklch(0.7 0.2 30);
+  --lime-glow: oklch(0.7 0.2 30 / 0.55);
 
-  /* Supporting brand swatches */
-  --sky-soft: oklch(0.82 0.08 235);
+  /* Supporting brand swatches — vibrant, warm-leaning, light-theme friendly */
+  --sky-soft: oklch(0.78 0.11 235);
   --terracotta: oklch(0.62 0.14 48);
   --navy: oklch(0.32 0.09 255);
+  --blush: oklch(0.74 0.16 10);
+  --butter: oklch(0.86 0.14 85);
+  --orchid: oklch(0.7 0.16 340);
+  --peach: oklch(0.8 0.13 55);
 
-  /* Primary action = coral, the warmest, most inviting hit */
   --primary: oklch(0.72 0.18 32);
   --primary-foreground: oklch(0.985 0.012 85);
 
@@ -84,15 +92,16 @@
   --muted: oklch(0.93 0.025 75);
   --muted-foreground: oklch(0.48 0.04 250);
 
-  --accent: oklch(0.86 0.19 125);
-  --accent-foreground: oklch(0.22 0.05 255);
+  /* Accent now coral too — no more green tints on toasts, checks, rings */
+  --accent: oklch(0.7 0.2 30);
+  --accent-foreground: oklch(0.985 0.012 85);
 
   --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(0.985 0.012 85);
 
   --border: oklch(0.86 0.035 70);
   --input: oklch(0.92 0.028 75);
-  --ring: oklch(0.72 0.18 32);
+  --ring: oklch(0.7 0.2 30);
 
   --sidebar: oklch(0.94 0.028 75);
   --sidebar-foreground: oklch(0.26 0.05 255);
@@ -101,13 +110,13 @@
   --sidebar-accent: oklch(0.91 0.034 70);
   --sidebar-accent-foreground: oklch(0.26 0.05 255);
   --sidebar-border: oklch(0.86 0.035 70);
-  --sidebar-ring: oklch(0.72 0.18 32);
+  --sidebar-ring: oklch(0.7 0.2 30);
 
   --chart-1: oklch(0.72 0.18 32);   /* coral */
-  --chart-2: oklch(0.82 0.08 235);  /* sky */
-  --chart-3: oklch(0.86 0.19 125);  /* lime */
+  --chart-2: oklch(0.78 0.11 235);  /* sky */
+  --chart-3: oklch(0.7 0.16 340);   /* orchid */
   --chart-4: oklch(0.62 0.14 48);   /* terracotta */
-  --chart-5: oklch(0.32 0.09 255);  /* navy */
+  --chart-5: oklch(0.86 0.14 85);   /* butter */
 }
 
 /* Keep .dark class working but mirror the warm palette so nothing flips to black */
@@ -157,7 +166,7 @@
 }
 .drift { animation: drift 6s ease-in-out infinite; will-change: transform; }
 
-/* Soft warm halo behind avatar bubbles in the event room */
+/* Soft warm halo behind avatar bubbles in the event room — coral/peach */
 .bubble-halo {
   position: relative;
 }
@@ -169,11 +178,11 @@
   background: radial-gradient(
     circle at 30% 30%,
     oklch(0.72 0.18 32 / 0.32),
-    oklch(0.86 0.19 125 / 0.18) 55%,
+    oklch(0.8 0.13 55 / 0.18) 55%,
     transparent 75%
   );
   border: 1px solid oklch(0.72 0.18 32 / 0.25);
-  box-shadow: inset 0 0 14px oklch(0.86 0.19 125 / 0.18), 0 0 28px oklch(0.72 0.18 32 / 0.18);
+  box-shadow: inset 0 0 14px oklch(0.8 0.13 55 / 0.2), 0 0 28px oklch(0.72 0.18 32 / 0.18);
   filter: blur(0.4px);
   pointer-events: none;
   z-index: -1;
@@ -194,7 +203,7 @@
   background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
 }
 
-/* Rising background bubbles — warm coral/lime mix */
+/* Rising background bubbles — multi-color warm palette (no green) */
 @keyframes bubble-rise {
   0% {
     transform: translate3d(0, 110vh, 0) scale(0.9);
@@ -213,17 +222,41 @@
 .bubble {
   position: absolute;
   border-radius: 9999px;
-  background: radial-gradient(
-    circle at 30% 30%,
-    oklch(0.72 0.18 32 / 0.45),
-    oklch(0.86 0.19 125 / 0.18) 55%,
-    transparent 75%
-  );
-  border: 1px solid oklch(0.72 0.18 32 / 0.3);
-  box-shadow: inset 0 0 12px oklch(0.86 0.19 125 / 0.2), 0 0 24px oklch(0.72 0.18 32 / 0.15);
   filter: blur(0.4px);
   animation: bubble-rise linear infinite;
   will-change: transform, opacity;
+}
+/* Default = coral (used when no variant class is applied) */
+.bubble,
+.bubble--coral {
+  background: radial-gradient(circle at 30% 30%, oklch(0.72 0.18 32 / 0.5), oklch(0.8 0.13 55 / 0.2) 55%, transparent 75%);
+  border: 1px solid oklch(0.72 0.18 32 / 0.3);
+  box-shadow: inset 0 0 12px oklch(0.8 0.13 55 / 0.22), 0 0 24px oklch(0.72 0.18 32 / 0.18);
+}
+.bubble--peach {
+  background: radial-gradient(circle at 30% 30%, oklch(0.8 0.13 55 / 0.55), oklch(0.86 0.14 85 / 0.22) 55%, transparent 75%);
+  border: 1px solid oklch(0.8 0.13 55 / 0.32);
+  box-shadow: inset 0 0 12px oklch(0.86 0.14 85 / 0.25), 0 0 24px oklch(0.8 0.13 55 / 0.18);
+}
+.bubble--butter {
+  background: radial-gradient(circle at 30% 30%, oklch(0.86 0.14 85 / 0.55), oklch(0.8 0.13 55 / 0.2) 55%, transparent 75%);
+  border: 1px solid oklch(0.86 0.14 85 / 0.35);
+  box-shadow: inset 0 0 12px oklch(0.86 0.14 85 / 0.3), 0 0 24px oklch(0.86 0.14 85 / 0.2);
+}
+.bubble--blush {
+  background: radial-gradient(circle at 30% 30%, oklch(0.74 0.16 10 / 0.5), oklch(0.7 0.16 340 / 0.2) 55%, transparent 75%);
+  border: 1px solid oklch(0.74 0.16 10 / 0.3);
+  box-shadow: inset 0 0 12px oklch(0.7 0.16 340 / 0.22), 0 0 24px oklch(0.74 0.16 10 / 0.18);
+}
+.bubble--orchid {
+  background: radial-gradient(circle at 30% 30%, oklch(0.7 0.16 340 / 0.5), oklch(0.78 0.11 235 / 0.2) 55%, transparent 75%);
+  border: 1px solid oklch(0.7 0.16 340 / 0.3);
+  box-shadow: inset 0 0 12px oklch(0.78 0.11 235 / 0.22), 0 0 24px oklch(0.7 0.16 340 / 0.18);
+}
+.bubble--sky {
+  background: radial-gradient(circle at 30% 30%, oklch(0.78 0.11 235 / 0.55), oklch(0.7 0.16 340 / 0.18) 55%, transparent 75%);
+  border: 1px solid oklch(0.78 0.11 235 / 0.32);
+  box-shadow: inset 0 0 12px oklch(0.7 0.16 340 / 0.2), 0 0 24px oklch(0.78 0.11 235 / 0.2);
 }
 @media (prefers-reduced-motion: reduce) {
   .bubble { animation: none; opacity: 0.2; }
