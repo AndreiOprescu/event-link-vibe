@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AvatarBubble } from "@/components/app/AvatarBubble";
-import { ArrowLeft, Mail, Linkedin, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Mail, Linkedin, MessageCircle, Play, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/hooks/useAuth";
 // TODO: re-enable break rooms
 // import { BreakRoomPicker } from "@/components/app/BreakRoomPicker";
 import { RoomChat, mediaLabel, type Msg } from "@/components/app/RoomChat";
+import { EventIntakeModal } from "@/components/app/EventIntakeModal";
+import { VideoIntroPrompt, VideoIntroRecorder } from "@/components/app/VideoIntro";
+import { getInitials } from "@/lib/initials";
 
 export const Route = createFileRoute("/_app/app/event/$eventId/")({
   head: () => ({ meta: [{ title: "Event room — EventLabs" }] }),
